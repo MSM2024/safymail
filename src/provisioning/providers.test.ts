@@ -184,7 +184,7 @@ test("Cloudflare KV namespace capacity allows reuse at the Free limit", async ()
 test("Cloudflare default fetch retains the Workers global receiver during token verification", async () => {
   const originalFetch = globalThis.fetch;
   let requested = "";
-  globalThis.fetch = function (input: RequestInfo | URL, init?: RequestInit) {
+  globalThis.fetch = function (this: typeof globalThis, input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) {
     assert.equal(this, globalThis, "Fetch must keep its global receiver in Workers");
     requested = String(input);
     assert.equal((init?.headers as Record<string, string>)?.Authorization, "Bearer " + "x".repeat(40));
