@@ -600,7 +600,21 @@ export default {
           await processProvisioningJob(env, message.body.installationId, message.body.jobId);
         }
         message.ack();
-      } catch {
+      } catch (error: unknown) {
+        const failure = error as {
+          name?: string;
+          provider?: string;
+          status?: number;
+          retryable?: boolean;
+        };
+
+        console.error("MSM_QUEUE_PROCESSING_FAILED", {
+          errorType: failure?.name ?? "UnknownError",
+          provider: failure?.provider ?? "internal",
+          status: failure?.status ?? null,
+          retryable: failure?.retryable === true
+        });
+
         message.retry({ delaySeconds: 120 });
       }
     }
