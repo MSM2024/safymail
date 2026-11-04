@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit",
     "db:local": "node scripts/apply-migrations.mjs local",
     "db:remote": "node scripts/apply-migrations.mjs remote",
-    "test": "tsx --test src/email/outbound-preflight.test.ts src/auth/totp.test.ts src/email/attachments.test.ts src/email/inbound.test.ts src/email/webhooks.test.ts src/email/resend-quota.test.ts src/provisioning/providers.test.ts src/provisioning/dns-plan.test.ts src/provisioning/email-routing-plan.test.ts src/provisioning/custom-domain-plan.test.ts control-plane/src/provisioning-jobs.test.ts control-plane/src/maintenance-jobs.test.ts && node scripts/validate-admin-html.mjs && npm run validate:composer && npm run validate:composer:r3 && npm run validate:outbound-readiness",
+    "test": "tsx --test src/email/outbound-preflight.test.ts src/auth/totp.test.ts src/email/attachments.test.ts src/email/inbound.test.ts src/email/webhooks.test.ts src/email/resend-quota.test.ts src/provisioning/providers.test.ts src/provisioning/dns-plan.test.ts src/provisioning/email-routing-plan.test.ts src/provisioning/custom-domain-plan.test.ts control-plane/src/provisioning-jobs.test.ts control-plane/src/maintenance-jobs.test.ts && node scripts/validate-admin-html.mjs && npm run validate:composer && npm run validate:composer:r3 && npm run validate:outbound-readiness && npm run validate:resend-audit",
     "validate:migrations": "node --disable-warning=ExperimentalWarning scripts/validate-migrations.mjs",
     "validate:pwa": "node scripts/validate-pwa.mjs",
     "validate:security": "node scripts/validate-security.mjs",
@@ -30,7 +30,8 @@
     "typecheck:scripts": "tsc --noEmit -p tsconfig.scripts.json",
     "validate:composer": "node scripts/validate-composer-r2.mjs",
     "validate:composer:r3": "node scripts/validate-composer-r3.mjs",
-    "validate:outbound-readiness": "node scripts/validate-outbound-readiness.mjs"
+    "validate:outbound-readiness": "node scripts/validate-outbound-readiness.mjs",
+    "validate:resend-audit": "node scripts/validate-resend-audit.mjs"
   },
   "dependencies": {
     "hono": "^4.10.4",
