@@ -1,1 +1,41 @@
 node_modules/
+.wrangler/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Local Wrangler configuration and secrets
+.dev.vars
+.dev.vars.*
+.env
+.env.*
+!.env.example
+!.env.sample
+wrangler.toml
+wrangler.*.toml
+!wrangler.example.toml
+!wrangler.*.example.toml
+
+# Recovered private email data: never push to GitHub
+migration/staging/
+migration/audit/
+migration/*.tar
+migration/*.tar.gz
+migration/*.zip
+migration/*.eml
+migration/*private*
+**/private-manifest.json
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Local exports and database snapshots
+*.sqlite
+*.sqlite3
+*.db
+*.db-shm
+*.db-wal
+*.bak
+*.backup
+*.log
