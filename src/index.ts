@@ -1424,7 +1424,8 @@ app.patch("/api/drafts/:id", async (c) => {
 
 app.get("/api/contacts", async (c) => {
   const user=c.get("user"), query=(c.req.query("q")||"").trim().slice(0,120), limit=Math.min(Math.max(Number(c.req.query("limit")||50),1),100);
-  const companyId=user.isSuperadmin?(c.req.query("company_id")||""):c.get("hostCompanyId");
+  const requestedCompanyId=(c.req.query("company_id")||"").trim();
+  const companyId=user.isSuperadmin?requestedCompanyId:(c.get("hostCompanyId")||requestedCompanyId);
   if(user.isSuperadmin&&!companyId){
     const rows=await c.env.DB.prepare(`SELECT id,company_id,email,display_name,notes,created_at FROM contacts
       WHERE (?='' OR email LIKE ? OR display_name LIKE ?) ORDER BY display_name,email LIMIT ?`)
@@ -1445,7 +1446,8 @@ app.get("/api/contacts", async (c) => {
 
 app.post("/api/contacts", async (c) => {
   const user=c.get("user"), body=await c.req.json<{company_id?:string;email?:string;display_name?:string;notes?:string}>().catch(()=>({} as any));
-  const companyId=user.isSuperadmin?(typeof body.company_id==="string"?body.company_id.trim():""):c.get("hostCompanyId");
+  const requestedCompanyId=typeof body.company_id==="string"?body.company_id.trim():"";
+  const companyId=user.isSuperadmin?requestedCompanyId:(c.get("hostCompanyId")||requestedCompanyId);
   const email=typeof body.email==="string"?body.email.trim().toLowerCase():"";
   const displayName=typeof body.display_name==="string"?body.display_name.trim():"";
   const notes=typeof body.notes==="string"?body.notes.trim():"";
