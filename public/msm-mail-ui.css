@@ -1,0 +1,38 @@
+/* MSM MAIL · UI restructuring round 1 · additive overrides */
+:root{--msm-focus:#8da7fb;--msm-shadow:0 18px 48px rgba(16,27,50,.17);--msm-touch:44px}
+html{scroll-behavior:smooth}
+body{min-width:320px}
+button,input,textarea,select{font:inherit}
+button:focus-visible,input:focus-visible,textarea:focus-visible,.message:focus-visible{outline:3px solid var(--msm-focus);outline-offset:2px}
+.app{height:100dvh;min-height:490px;overflow:hidden}
+.sidebar{height:100%;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+.main{height:100%;min-height:0;overflow:hidden}
+.content{min-height:0;overflow:hidden}
+.list-panel,.reader{min-height:0}
+.messages{max-height:none;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+.reader{overflow-y:auto}
+.topbar{flex-shrink:0}
+.folder,.account,.compose{touch-action:manipulation}
+.folder-icon{display:inline-flex;align-items:center;justify-content:center;flex:0 0 19px}
+.folder-icon svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.folder.active .folder-icon{color:#c0ccff}
+.compose{display:flex;justify-content:center;align-items:center;gap:8px;min-height:var(--msm-touch);border-radius:12px}
+.compose svg{width:18px;height:18px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.message{min-height:68px}
+.modal{box-shadow:var(--msm-shadow);max-height:calc(100dvh - 30px)}
+#compose-modal{width:min(760px,calc(100vw - 28px));max-height:calc(100dvh - 32px);margin:auto;border-radius:16px;overflow:hidden}
+#compose-modal[open]{display:flex;flex-direction:column}
+#compose-modal .modal-head{flex-shrink:0;gap:10px}
+#compose-modal .modal-head h2{flex:1;min-width:0}
+#compose-modal .compose-form{min-height:0;overflow-y:auto;overscroll-behavior:contain;flex:1}
+#compose-modal .compose-form textarea{min-height:165px;max-height:36vh}
+#compose-modal .compose-footer{position:sticky;bottom:-18px;padding:12px 0 4px;background:#fff;border-top:1px solid var(--line);flex-wrap:wrap}
+#compose-modal .compose-footer small{flex:1 1 200px}
+#compose-modal.msm-expanded{width:min(1130px,calc(100vw - 18px));height:calc(100dvh - 18px);max-height:calc(100dvh - 18px)}
+#compose-modal.msm-expanded .compose-form textarea{min-height:32vh;max-height:none}
+.msm-compose-toolbar{display:flex;align-items:center;gap:6px}
+.msm-compose-toolbar button{display:grid;place-items:center;min-width:34px;min-height:34px;border:1px solid var(--line);border-radius:8px;background:white;color:var(--ink)}
+.msm-compose-toolbar button svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+@media(max-width:1050px){.app{grid-template-columns:220px minmax(0,1fr)}.content{grid-template-columns:minmax(235px,40%) minmax(0,1fr);gap:11px;padding:12px}.topbar{padding:0 15px}.sidebar{padding:18px 11px}}
+@media(max-width:650px){.app{display:block;height:100dvh;min-height:0;overflow:hidden}.sidebar{height:100dvh;z-index:30}.main{height:100dvh}.topbar{height:58px;min-height:58px}.content{height:calc(100dvh - 58px);min-height:0;overflow:hidden}.list-panel,.reader{height:100%;min-height:0}.messages{max-height:none;min-height:0}.message{min-height:72px}#compose-modal,#compose-modal.msm-expanded{width:100vw;max-width:100vw;height:100dvh;max-height:100dvh;margin:0;border-radius:0}#compose-modal .modal-head{padding:12px 14px}#compose-modal .compose-form{padding:14px 15px 20px;gap:10px}#compose-modal .compose-form textarea{min-height:180px}#compose-modal .compose-footer{bottom:-20px}#compose-modal .compose-footer>div{width:100%;justify-content:flex-end;flex-wrap:wrap}#compose-modal .compose-footer button{min-height:var(--msm-touch)}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.sidebar,.message{transition:none!important}}
