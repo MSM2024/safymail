@@ -74,15 +74,24 @@ export class ResendClient {
   async ensureWebhook(endpoint: string, events: string[], existingSigningSecret?: string): Promise<{ webhook: ResendWebhook; created: boolean; signingSecret: string }> {
     const existing = (await this.listWebhooks()).find(item => item.endpoint === endpoint);
     if (existing) {
-      const signingSecret = existing.signing_secret || existingSigningSecret;
-      if (!signingSecret) throw new ProviderError("A webhook already exists for this endpoint, but its signing secret is not retrievable. Supply the secret from the installation vault or remove the webhook manually before retrying.", "resend", 409, false);
+      // The webhook may have been created by an earlier attempt before its
+      // response could be persisted. Retrieve the existing secret without
+      // deleting the webhook or silently rotating its signing key.
+      const details = existing.signing_secret || existingSigningSecret
+        ? existing
+        : await this.request<ResendWebhook>("/webhooks/" + encodeURIComponent(existing.id));
+      const signingSecret = existing.signing_secret || existingSigningSecret || details.signing_secret;
+      if (!signingSecret) throw new ProviderError("A webhook already exists for this endpoint, but its signing secret is not retrievable. Supply the secret from the installation vault or retrieve it from the Resend dashboard before retrying.", "resend", 409, false);
       return { webhook: existing, created: false, signingSecret };
     }
-    const result = await this.request<ResendItem<ResendWebhook>>("/webhooks", {
+    // Resend REST API returns a flat webhook object, not { data: webhook }.
+    // Preserve compatibility with mocked/legacy wrapped responses.
+    const response = await this.request<ResendWebhook | ResendItem<ResendWebhook>>("/webhooks", {
       method: "POST", body: JSON.stringify({ endpoint, events })
     });
-    const signingSecret = result.data.signing_secret;
-    if (!signingSecret) throw new ProviderError("Resend created the webhook but did not return its signing secret. Retrieve/configure it in the Resend dashboard before continuing.", "resend", 502, false);
-    return { webhook: result.data, created: true, signingSecret };
+    const webhook = "data" in response ? response.data : response;
+    const signingSecret = webhook?.signing_secret;
+    if (!webhook?.id || !signingSecret) throw new ProviderError("Resend created the webhook but returned an incomplete response. Retrieve its signing secret from the Resend dashboard before continuing.", "resend", 502, false);
+    return { webhook: { ...webhook, endpoint, events }, created: true, signingSecret };
   }
 }
