@@ -1,0 +1,32 @@
+name: MSM Mail Engineering Gate
+
+on:
+  pull_request:
+    branches: [main, feature/msm-mail-composer-drafts-r2]
+  push:
+    branches: [main, feature/msm-mail-composer-drafts-r2, feature/msm-mail-composer-contacts-r3]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Tests and Composer contracts
+        run: npm test
+      - name: Validate PWA
+        run: npm run validate:pwa
+      - name: Validate security
+        run: npm run validate:security
