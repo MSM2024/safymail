@@ -39,3 +39,9 @@ migration/*private*
 *.bak
 *.backup
 *.log
+/installation.json
+__pycache__/
+*.pyc
+*.backup-*
+/MSM-MAIL-AUDIT-RECOVERY.ps1
+/msm-mail-*.py
