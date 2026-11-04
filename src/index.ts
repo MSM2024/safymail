@@ -4,6 +4,7 @@ import { arrayBufferToBase64, isAllowedAttachment, parseOutboundAttachments } fr
 import { releaseMailStorage, reserveMailStorage } from "./email/storage";
 import { verifyResendWebhook } from "./email/webhooks";
 import { sendViaResendRelay } from "./email/resend-relay";
+import { getOutboundPreflight } from "./email/outbound-preflight";
 import { requireSession, getUserCompanies, hashPassword } from "./middleware/auth";
 import { authRoutes } from "./auth/routes";
 import { securityRoutes } from "./auth/security";
@@ -1181,6 +1182,17 @@ async function getSendAccount(c: any, accountId: string, user: { id: string; isS
       AND ap.permission IN ('read_write','send_only')
   ) AND (? IS NULL OR ea.company_id = ?)`).bind(accountId, user.id, c.get("hostCompanyId"), c.get("hostCompanyId")).first();
 }
+
+// Read-only per-mailbox send preflight. Does not contact Resend or disclose secrets.
+app.get("/api/sending/readiness", async (c) => {
+  const accountId = (c.req.query("account_id") || "").trim();
+  if (!accountId || accountId.length > 128) return c.json({error:"invalid_account_id"},400);
+  const user = c.get("user");
+  const account = await getSendAccount(c,accountId,user);
+  if (!account) return c.json({ready:false,transport:"resend_relay",reason:"account_or_domain_not_ready"});
+  const preflight = getOutboundPreflight(c.env);
+  return c.json({...preflight,account_id:accountId});
+});
 
 app.post("/api/messages/send", async (c) => {
   const user = c.get("user");
