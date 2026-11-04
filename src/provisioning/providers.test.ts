@@ -222,3 +222,46 @@ test("Resend default fetch retains the Workers global receiver during provider p
     globalThis.fetch = originalFetch;
   }
 });
+
+test("Resend accepts the flat REST webhook creation response and persists signing secret", async () => {
+  const calls: string[] = [];
+  const endpoint = "https://control.example.com/webhooks/resend/provider-1";
+  const client = new ResendClient({
+    apiKey: "re_" + "x".repeat(40),
+    fetcher: async (input, init) => {
+      calls.push((init?.method || "GET") + " " + String(input));
+      if (init?.method === "POST") return new Response(JSON.stringify({
+        object: "webhook", id: "wh-flat", signing_secret: "whsec_flat"
+      }), { status: 201 });
+      return new Response(JSON.stringify({ data: [] }), { status: 200 });
+    }
+  });
+  const created = await client.ensureWebhook(endpoint, ["email.sent"]);
+  assert.equal(created.created, true);
+  assert.equal(created.webhook.id, "wh-flat");
+  assert.equal(created.webhook.endpoint, endpoint);
+  assert.equal(created.signingSecret, "whsec_flat");
+  assert.equal(calls.filter(call => call.startsWith("POST ")).length, 1);
+});
+
+test("Resend safely retrieves the secret for an already-created webhook without a second POST", async () => {
+  const endpoint = "https://control.example.com/webhooks/resend/provider-1";
+  const calls: string[] = [];
+  const client = new ResendClient({
+    apiKey: "re_" + "x".repeat(40),
+    fetcher: async (input, init) => {
+      calls.push((init?.method || "GET") + " " + String(input));
+      if (String(input).endsWith("/webhooks/wh-existing")) return new Response(JSON.stringify({
+        object: "webhook", id: "wh-existing", signing_secret: "whsec_existing"
+      }), { status: 200 });
+      return new Response(JSON.stringify({ data: [{
+        id: "wh-existing", endpoint, events: ["email.sent"]
+      }] }), { status: 200 });
+    }
+  });
+  const found = await client.ensureWebhook(endpoint, ["email.sent"]);
+  assert.equal(found.created, false);
+  assert.equal(found.signingSecret, "whsec_existing");
+  assert.ok(calls.some(call => call.endsWith("/webhooks/wh-existing")));
+  assert.equal(calls.filter(call => call.startsWith("POST ")).length, 0);
+});
