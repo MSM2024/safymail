@@ -200,3 +200,25 @@ test("Cloudflare default fetch retains the Workers global receiver during token 
     globalThis.fetch = originalFetch;
   }
 });
+
+test("Resend default fetch retains the Workers global receiver during provider preflight", async () => {
+  const originalFetch = globalThis.fetch;
+  const seen: string[] = [];
+  globalThis.fetch = function (this: typeof globalThis, input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) {
+    assert.equal(this, globalThis, "Fetch must retain its global receiver in Workers");
+    const url = String(input);
+    seen.push(url);
+    assert.equal((init?.headers as Record<string, string>)?.Authorization, "Bearer re_" + "x".repeat(40));
+    return Promise.resolve(new Response(JSON.stringify({ data: [] }), { status: 200 }));
+  } as typeof fetch;
+  try {
+    const client = new ResendClient({ apiKey: "re_" + "x".repeat(40) });
+    await client.assertFreeCapacity("msmmystore.com", "https://control.example.com/webhooks/resend/provider-id", 1);
+    assert.deepEqual(seen.sort(), [
+      "https://api.resend.com/domains",
+      "https://api.resend.com/webhooks"
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
