@@ -68,4 +68,4 @@ try{
    @($parsed)[0].results | Format-Table domain,status,provider_status -AutoSize
  }
 }catch{Write-Host "Control D1 query failed" -ForegroundColor Yellow}
-Write-Host "AUDIT COMPLETE — No changes or email sends were performed." -ForegroundColor Green
+Write-Host "AUDIT COMPLETE - No changes or email sends were performed." -ForegroundColor Green
