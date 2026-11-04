@@ -21,7 +21,9 @@ export class CloudflareClient {
   constructor(private readonly config: CloudflareConfig) {
     if (!/^[a-f0-9]{32}$/i.test(config.accountId)) throw new Error("Invalid Cloudflare account ID.");
     if (!config.apiToken || config.apiToken.length < 20) throw new Error("Cloudflare API token is missing or invalid.");
-    this.fetcher = config.fetcher || fetch;
+    // Cloudflare Workers requires the host fetch function to retain its global receiver.
+    // Referencing fetch as a class property can throw TypeError before an HTTP response.
+    this.fetcher = config.fetcher || ((input, init) => globalThis.fetch(input, init));
   }
 
   private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
