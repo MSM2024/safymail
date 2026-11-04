@@ -283,7 +283,7 @@ app.get("/api/messages", async (c) => {
   const filter = c.req.query("filter") || "all";
   const cursorDate = c.req.query("cursor_date") || null;
   const cursorId = c.req.query("cursor_id") || "";
-  const allowedFolders = ["inbox", "sent", "drafts", "archive", "trash"];
+  const allowedFolders = ["inbox", "sent", "drafts", "archive", "trash", "spam"]; // MSM_LEGACY_SPAM_VIEW_V1
   if (!accountId || !allowedFolders.includes(folder) || !["all", "unread", "starred", "important"].includes(filter)) {
     return c.json({ error: "invalid_query" }, 400);
   }
@@ -307,6 +307,9 @@ app.get("/api/messages", async (c) => {
             COALESCE(received_at, sent_at, created_at) AS sort_at
      FROM messages
      WHERE account_id = ? AND folder = ?
+       AND ((? = 'spam' AND spam_reasons_json LIKE '%legacy_mailu_junk%')
+         OR (? = 'trash' AND spam_reasons_json NOT LIKE '%legacy_mailu_junk%')
+         OR (? NOT IN ('spam','trash')))
        AND (? = '' OR subject LIKE ? OR from_address LIKE ? OR to_addresses LIKE ?)
        AND (? != 'unread' OR is_read = 0)
        AND (? != 'starred' OR is_starred = 1)
@@ -315,7 +318,7 @@ app.get("/api/messages", async (c) => {
          OR (COALESCE(received_at, sent_at, created_at) = ? AND id < ?))
      ORDER BY COALESCE(received_at, sent_at, created_at) DESC, id DESC
      LIMIT ?`
-  ).bind(accountId, folder, query, "%"+query+"%", "%"+query+"%", "%"+query+"%",
+  ).bind(accountId, folder === "spam" ? "trash" : folder, folder, folder, folder, query, "%"+query+"%", "%"+query+"%", "%"+query+"%",
     filter, filter, filter, cursorDate, cursorDate, cursorDate, cursorId, limit).all();
 
   const last = rows.results.length ? rows.results[rows.results.length - 1] as any : null;
@@ -350,7 +353,10 @@ app.get("/api/messages/:id", async (c) => {
   const attachments = await c.env.DB.prepare(
     "SELECT id, filename, content_type, size_bytes FROM attachments WHERE message_id = ? ORDER BY filename"
   ).bind(id).all();
-  return c.json({ message: row, attachments: attachments.results });
+  const visibleMessage = (row as any).folder === "trash" &&
+    String((row as any).spam_reasons_json || "").includes("legacy_mailu_junk")
+    ? { ...(row as any), folder: "spam" } : row;
+  return c.json({ message: visibleMessage, attachments: attachments.results });
 });
 
 app.get("/api/attachments/:id", async (c) => {
@@ -401,7 +407,7 @@ app.patch("/api/messages/:id", async (c) => {
   const user = c.get("user");
   const id = c.req.param("id");
   const body = await c.req.json<{ is_read?: boolean; is_starred?: boolean; is_important?: boolean; folder?: string }>().catch(() => ({} as any));
-  const allowedMoveFolders = ["inbox", "archive", "trash"];
+  const allowedMoveFolders = ["inbox", "archive", "trash", "spam"];
   if (typeof body.is_read !== "boolean" && typeof body.is_starred !== "boolean" && typeof body.is_important !== "boolean" &&
       !(typeof body.folder === "string" && allowedMoveFolders.includes(body.folder))) {
     return c.json({ error: "no_supported_changes" }, 400);
@@ -425,7 +431,17 @@ app.patch("/api/messages/:id", async (c) => {
   if (typeof body.is_read === "boolean") { updates.push("is_read = ?"); values.push(body.is_read ? 1 : 0); }
   if (typeof body.is_starred === "boolean") { updates.push("is_starred = ?"); values.push(body.is_starred ? 1 : 0); }
   if (typeof body.is_important === "boolean") { updates.push("is_important = ?"); values.push(body.is_important ? 1 : 0); }
-  if (typeof body.folder === "string" && allowedMoveFolders.includes(body.folder)) { updates.push("folder = ?"); values.push(body.folder); }
+  if (typeof body.folder === "string" && allowedMoveFolders.includes(body.folder)) {
+    updates.push("folder = ?");
+    values.push(body.folder === "spam" ? "trash" : body.folder);
+    if (body.folder === "spam") {
+      updates.push("spam_reasons_json = ?");
+      values.push('["legacy_mailu_junk"]');
+      updates.push("spam_score = 10");
+    } else {
+      updates.push("spam_reasons_json = CASE WHEN spam_reasons_json LIKE '%legacy_mailu_junk%' THEN '[]' ELSE spam_reasons_json END");
+    }
+  }
   values.push(id);
   await c.env.DB.prepare(`UPDATE messages SET ${updates.join(", ")} WHERE id = ?`).bind(...values).run();
   return c.json({ id, updated: true });
