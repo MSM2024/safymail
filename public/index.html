@@ -70,7 +70,7 @@ body{background:radial-gradient(ellipse at 72% -20%,#e8edff 0,transparent 42%),v
 <div class="sidefoot">Mail Center<br><span id="connection">Conectando de forma segura…</span></div></aside>
 <main class="main"><header class="topbar"><div style="display:flex;align-items:center;gap:12px"><button class="mobile-menu" id="menu" aria-label="Abrir menú">☰</button><div class="crumb">Correo / <strong id="crumb">Recibidos</strong></div></div><div class="user"><div class="avatar" id="avatar">E</div><div class="user-meta"><span id="user-name">Verificando sesión</span><small id="user-email"></small></div><div class="user-tools" id="user-tools"></div><button class="btn" id="install-app" type="button" hidden>Instalar app</button><button class="btn" id="logout" type="button">Salir</button></div></header>
 <div class="content"><section class="panel list-panel"><div class="list-head"><h1 id="list-title">Recibidos</h1><div class="sub" id="account-label">Selecciona una cuenta para comenzar</div><button class="compose" id="compose">＋ Redactar correo</button><input class="search" id="search" type="search" placeholder="Buscar por remitente, asunto o dirección…" aria-label="Buscar correos"><div class="quick-filters" role="group" aria-label="Filtrar mensajes"><button class="quick-filter active" type="button" data-filter="all" aria-pressed="true">Todos</button><button class="quick-filter" type="button" data-filter="unread" aria-pressed="false">No leídos</button><button class="quick-filter" type="button" data-filter="starred" aria-pressed="false">Destacados</button><button class="quick-filter" type="button" data-filter="important" aria-pressed="false">Importantes</button></div></div><div class="messages" id="messages"><div class="loading">Cargando bandeja…</div></div><button class="btn" id="load-more" type="button" hidden style="margin:10px auto">Cargar más mensajes</button><div class="status" id="list-status"></div></section><section class="panel reader" id="reader"><div class="empty"><div class="empty-icon">✉</div><strong>Tu espacio de trabajo</strong><p>Selecciona un mensaje para leerlo.</p></div></section></div></main></div>
-<dialog class="modal" id="compose-modal"><div class="modal-head"><h2>Nuevo mensaje</h2><button class="btn" id="close-compose" type="button">Cerrar</button></div><form class="compose-form" id="compose-form"><label>Para<input id="draft-to" placeholder="cliente@empresa.com (separa con comas)"></label><label>CC<input id="draft-cc" placeholder="Opcional"></label><label>CCO<input id="draft-bcc" placeholder="Opcional"></label><label>Asunto<input id="draft-subject" maxlength="998"></label><label>Mensaje<textarea id="draft-body" maxlength="200000" placeholder="Escribe tu mensaje…"></textarea></label><label>Adjuntar archivos<input id="draft-files" type="file" multiple accept=".pdf,.docx,.jpg,.jpeg,.png,.gif,.webp,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png,image/gif,image/webp"><small>PDF, DOCX, JPG, PNG, GIF o WebP · Hasta 5 archivos · 5 MB por archivo · 10 MB en total</small></label><div class="file-summary" id="file-summary"><span>No hay archivos adjuntos.</span><strong>0 archivos · 0 MB</strong></div><div class="compose-footer"><small id="draft-status">El envío requiere que el dominio del buzón esté verificado.</small><div><button class="btn" id="save-draft" type="button">Guardar borrador</button><button class="btn primary" id="send-message" type="button">Enviar</button></div></div></form></dialog>
+<dialog class="modal" id="compose-modal"><div class="modal-head"><h2>Nuevo mensaje</h2><button class="btn" id="close-compose" type="button">Cerrar</button></div><form class="compose-form" id="compose-form"><label>Para<input id="draft-to" placeholder="cliente@empresa.com (separa con comas)"></label><label>CC<input id="draft-cc" placeholder="Opcional"></label><label>CCO<input id="draft-bcc" placeholder="Opcional"></label><label>Asunto<input id="draft-subject" maxlength="998"></label><label>Mensaje<textarea id="draft-body" maxlength="200000" placeholder="Escribe tu mensaje…"></textarea></label><label>Adjuntar archivos<input id="draft-files" type="file" multiple accept=".pdf,.docx,.jpg,.jpeg,.png,.gif,.webp,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png,image/gif,image/webp"><small>PDF, DOCX, JPG, PNG, GIF o WebP · Hasta 5 archivos · 5 MB por archivo · 10 MB en total</small></label><div class="file-summary" id="file-summary"><span>No hay archivos adjuntos.</span><strong>0 archivos · 0 MB</strong></div><div class="compose-footer"><small id="draft-status">El envío requiere que el dominio del buzón esté verificado.</small><small id="send-readiness" role="status" aria-live="polite">Comprobando envío…</small><div><button class="btn" id="save-draft" type="button">Guardar borrador</button><button class="btn primary" id="send-message" type="button">Enviar</button></div></div></form></dialog>
 <dialog class="modal" id="contacts-modal"><div class="modal-head"><h2>Contactos</h2><button class="btn" id="close-contacts" type="button">Cerrar</button></div><div style="padding:18px 20px"><form id="contact-form" class="compose-form" style="padding:0 0 16px"><label>Correo electrónico<input id="contact-email" type="email" maxlength="254" required></label><label>Nombre visible<input id="contact-name" maxlength="120"></label><label>Notas<textarea id="contact-notes" maxlength="2000" style="min-height:70px"></textarea></label><button class="btn primary" type="submit">Guardar contacto</button><small id="contact-status"></small></form><div id="contact-list" style="display:grid;gap:8px;max-height:45vh;overflow:auto"></div></div></dialog>
 <div id="notification-toast" class="notification-toast" role="status" aria-live="polite" hidden></div>
 <dialog class="modal" id="security-modal"><div class="modal-head"><h2 id="security-title">Seguridad de la cuenta</h2><button class="btn" id="close-security" type="button">Cerrar</button></div><div class="security-content" id="security-content"></div></dialog><script>
@@ -119,6 +119,22 @@ const draftPayload=()=>({
  account_id:state.account.id,to:splitRecipients("draft-to"),cc:splitRecipients("draft-cc"),
  bcc:splitRecipients("draft-bcc"),subject:$("draft-subject").value,text_body:$("draft-body").value
 });
+async function refreshSendReadiness(){
+ const accountId=state.account?.id,generation=draftGeneration;
+ const indicator=$("send-readiness");
+ if(!indicator)return;
+ indicator.textContent="Comprobando disponibilidad de envío…";
+ if(!accountId)return;
+ try{
+   const result=await api("/api/sending/readiness?account_id="+encodeURIComponent(accountId));
+   if(generation!==draftGeneration||state.account?.id!==accountId)return;
+   indicator.textContent=result.ready
+     ?"Resend: configuración preparada · La entrega se confirmará al enviar."
+     :"Envío pendiente de configuración o verificación del dominio.";
+ }catch{
+   if(generation===draftGeneration)indicator.textContent="No se pudo verificar el estado de envío.";
+ }
+}
 function openComposer(title="Nuevo mensaje"){
  state.replyHeaders=null;
  if(!state.account){$("list-status").textContent="Selecciona un buzón antes de redactar.";return;}
@@ -127,6 +143,7 @@ function openComposer(title="Nuevo mensaje"){
  $("draft-status").textContent="Autoguardado activado. Los adjuntos se incorporan al enviar.";
  $("file-summary").innerHTML="<span>No hay archivos adjuntos.</span><strong>0 archivos · 0 MB</strong>";
  $("compose-modal").showModal();
+ void refreshSendReadiness();
 }
 async function editDraft(message){
  if(!state.account)return;
