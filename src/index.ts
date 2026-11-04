@@ -1311,6 +1311,43 @@ app.post("/api/messages/send", async (c) => {
   return c.json({id:messageId,status:"sent",provider_message_id:relay.providerId},201);
 });
 
+// Draft read/delete routes: scoped to the sender's permitted account.
+async function authorizeDraft(c: any, id: string) {
+  const user = c.get("user");
+  if (user.isSuperadmin) {
+    return c.env.DB.prepare(
+      `SELECT m.id,m.account_id,m.to_addresses,m.cc_addresses,m.bcc_addresses,m.subject,m.text_body
+       FROM messages m JOIN email_accounts ea ON ea.id=m.account_id
+       JOIN companies co ON co.id=ea.company_id
+       WHERE m.id=? AND m.folder='drafts' AND ea.status='active' AND co.status='active'`
+    ).bind(id).first();
+  }
+  return c.env.DB.prepare(
+    `SELECT m.id,m.account_id,m.to_addresses,m.cc_addresses,m.bcc_addresses,m.subject,m.text_body
+     FROM messages m JOIN email_accounts ea ON ea.id=m.account_id
+     JOIN companies co ON co.id=ea.company_id
+     JOIN company_memberships cm ON cm.company_id=ea.company_id AND cm.user_id=?
+     JOIN account_permissions ap ON ap.account_id=ea.id AND ap.user_id=?
+     WHERE m.id=? AND m.folder='drafts' AND ea.status='active' AND co.status='active'
+       AND ap.permission IN ('read_write','send_only')
+       AND (? IS NULL OR ea.company_id=?)`
+  ).bind(user.id,user.id,id,c.get("hostCompanyId"),c.get("hostCompanyId")).first();
+}
+
+app.get("/api/drafts/:id", async (c) => {
+  const draft = await authorizeDraft(c,c.req.param("id"));
+  if (!draft) return c.json({error:"draft_not_found"},404);
+  return c.json({draft});
+});
+
+app.delete("/api/drafts/:id", async (c) => {
+  const id=c.req.param("id");
+  const draft=await authorizeDraft(c,id);
+  if (!draft) return c.json({error:"draft_not_found"},404);
+  const result=await c.env.DB.prepare("DELETE FROM messages WHERE id=? AND folder='drafts'").bind(id).run();
+  return c.json({id,deleted:result.meta.changes===1});
+});
+
 app.post("/api/drafts", async (c) => {
   const user = c.get("user");
   const body = await c.req.json<{
