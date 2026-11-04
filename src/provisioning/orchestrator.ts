@@ -49,7 +49,9 @@ export async function provisionCoreResources(input: ProvisioningInput): Promise<
   }
   const slug = safeSlug(input.workerName);
   const d1Name = slug + "-db";
-  const kvTitle = slug + "-mail-storage";
+  const kvTitle = slug === "msm-mail-preview"
+  ? "msm-mail-preview-storage"
+  : slug + "-mail-storage";
   const cf = new CloudflareClient(input.cloudflare);
   const resend = new ResendClient(input.resend);
 

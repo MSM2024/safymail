@@ -206,6 +206,40 @@ export async function processProvisioningJob(env: ProvisioningJobEnv, installati
     const retryable = error?.retryable === true || error?.status === 429 ||
       (typeof error?.status === "number" && error.status >= 500) ||
       (!error?.provider && !permanentErrors.has(String(error?.message || "")));
+    await audit(
+      env.CONTROL_DB,
+      installationId,
+      "provisioning.attempt_failed",
+      "failure",
+      {
+        errorType: String(error?.name || "UnknownError"),
+        provider: String(error?.provider || "internal"),
+        status: typeof error?.status === "number" ? error.status : null,
+        retryable,
+        errorCode: [
+          "domain_zone_not_found",
+          "domain_zone_not_active",
+          "provider_account_webhook_not_configured"
+        ].includes(String(error?.message || ""))
+          ? String(error.message)
+          : "unclassified",
+        faultHint: (() => {
+          const msg = String(error?.message || "");
+          if (/fetch|network|connect/i.test(msg)) return "network_or_fetch";
+          if (/decrypt|encrypt|crypto|key|nonce/i.test(msg)) return "cryptography";
+          if (/undefined|null|not a function|not iterable/i.test(msg)) return "runtime_type";
+          if (/JSON|parse/i.test(msg)) return "response_parsing";
+          return "unknown";
+        })(),
+        stackFrames: String(error?.stack || "")
+          .split("\n")
+          .slice(1, 4)
+          .map((line: string) => line.trim()
+            .replace(/https?:\/\/\S+/g, "[url]")
+            .slice(0, 180))
+      }
+    ).catch(() => {});
+
     if (retryable) {
       await env.CONTROL_DB.prepare(
         "UPDATE control_installations SET current_step='queued',provision_lock=NULL,lock_expires_at=NULL,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND provision_lock=?"
