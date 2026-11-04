@@ -1,0 +1,43 @@
+{
+  "name": "mail-center-template",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "db:local": "node scripts/apply-migrations.mjs local",
+    "db:remote": "node scripts/apply-migrations.mjs remote",
+    "test": "tsx --test src/auth/totp.test.ts src/email/attachments.test.ts src/email/inbound.test.ts src/email/webhooks.test.ts src/email/resend-quota.test.ts src/provisioning/providers.test.ts src/provisioning/dns-plan.test.ts src/provisioning/email-routing-plan.test.ts src/provisioning/custom-domain-plan.test.ts control-plane/src/provisioning-jobs.test.ts control-plane/src/maintenance-jobs.test.ts && node scripts/validate-admin-html.mjs",
+    "validate:migrations": "node --disable-warning=ExperimentalWarning scripts/validate-migrations.mjs",
+    "validate:pwa": "node scripts/validate-pwa.mjs",
+    "validate:security": "node scripts/validate-security.mjs",
+    "configure:installation": "node scripts/configure-installation.mjs",
+    "test:installer": "node scripts/test-configure-installation.mjs",
+    "dev:control-plane": "wrangler dev --config wrangler.control-plane.toml",
+    "db:control-plane:local": "wrangler d1 migrations apply mail-center-control-plane --local --config wrangler.control-plane.toml",
+    "db:control-plane:remote": "wrangler d1 migrations apply mail-center-control-plane --remote --config wrangler.control-plane.toml",
+    "queues:control-plane:create": "wrangler queues create mail-center-provisioning && wrangler queues create mail-center-provisioning-dlq",
+    "configure:maintenance-secret": "node scripts/configure-maintenance-secret.mjs",
+    "deploy:installation": "node scripts/deploy-installation.mjs",
+    "plan:dns": "tsx scripts/plan-dns.ts",
+    "apply:dns": "tsx scripts/apply-dns.ts",
+    "plan:email-routing": "tsx scripts/plan-email-routing.ts",
+    "setup:email-routing": "tsx scripts/setup-email-routing.ts",
+    "plan:custom-domain": "tsx scripts/setup-custom-domain.ts",
+    "setup:custom-domain": "tsx scripts/setup-custom-domain.ts",
+    "typecheck:scripts": "tsc --noEmit -p tsconfig.scripts.json"
+  },
+  "dependencies": {
+    "hono": "^4.10.4",
+    "postal-mime": "^4.2.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261102.1",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.45.0",
+    "tsx": "^4.20.6",
+    "@types/node": "^22.19.0"
+  }
+}

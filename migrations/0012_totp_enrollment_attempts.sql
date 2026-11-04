@@ -1,0 +1,1 @@
+ALTER TABLE users ADD COLUMN totp_pending_attempts INTEGER NOT NULL DEFAULT 0;

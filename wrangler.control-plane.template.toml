@@ -1,0 +1,31 @@
+name = "mail-center-control-plane"
+main = "control-plane/src/index.ts"
+account_id = "{{CLOUDFLARE_ACCOUNT_ID}}"
+compatibility_date = "2026-11-02"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "CONTROL_DB"
+database_name = "mail-center-control-plane"
+database_id = "{{CONTROL_PLANE_DATABASE_ID}}"
+migrations_dir = "control-plane/migrations"
+
+[vars]
+CONTROL_PLANE_ENV = "development"
+CONTROL_PLANE_PUBLIC_URL = "https://{{CONTROL_PLANE_WORKER_HOST}}"
+
+[[queues.producers]]
+binding = "PROVISIONING_QUEUE"
+queue = "mail-center-provisioning"
+
+[[queues.consumers]]
+queue = "mail-center-provisioning"
+max_batch_size = 1
+max_batch_timeout = 1
+max_retries = 10
+dead_letter_queue = "mail-center-provisioning-dlq"
+max_concurrency = 2
+retry_delay = 120
+
+[triggers]
+crons = ["*/5 * * * *"] # credential cleanup every 5m; maintenance fan-out every 15m
