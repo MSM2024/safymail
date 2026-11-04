@@ -17,7 +17,8 @@ export class ResendClient {
   private readonly baseUrl: string;
   constructor(private readonly config: ResendConfig) {
     if (!config.apiKey || config.apiKey.length < 20) throw new Error("Resend API key is missing or invalid.");
-    this.fetcher = config.fetcher || fetch;
+    // Keep the Workers global fetch receiver; a bare fetch stored on this class can throw TypeError.
+    this.fetcher = config.fetcher || ((input, init) => globalThis.fetch(input, init));
     this.baseUrl = config.region === "eu-west-1" ? "https://api.resend.com" : "https://api.resend.com";
   }
 
