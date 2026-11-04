@@ -180,3 +180,23 @@ test("Cloudflare KV namespace capacity allows reuse at the Free limit", async ()
   });
   await assert.doesNotReject(() => client.assertFreeCapacity("existing-db", "existing-worker", "existing-kv"));
 });
+
+test("Cloudflare default fetch retains the Workers global receiver during token verification", async () => {
+  const originalFetch = globalThis.fetch;
+  let requested = "";
+  globalThis.fetch = function (input: RequestInfo | URL, init?: RequestInit) {
+    assert.equal(this, globalThis, "Fetch must keep its global receiver in Workers");
+    requested = String(input);
+    assert.equal((init?.headers as Record<string, string>)?.Authorization, "Bearer " + "x".repeat(40));
+    return Promise.resolve(new Response(JSON.stringify({
+      success: true, result: { id: "verified-token" }
+    }), { status: 200 }));
+  } as typeof fetch;
+  try {
+    const client = new CloudflareClient({ accountId: "a".repeat(32), apiToken: "x".repeat(40) });
+    await client.verifyToken();
+    assert.equal(requested, "https://api.cloudflare.com/client/v4/user/tokens/verify");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
