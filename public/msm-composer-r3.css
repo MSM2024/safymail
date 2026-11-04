@@ -1,0 +1,18 @@
+/* MSM MAIL Composer R3: accessible contact finder and file chips */
+.msm-recipient-host{position:relative}
+.msm-contact-suggestions{position:absolute;inset-inline:0;top:calc(100% - 2px);z-index:120;max-height:260px;overflow:auto;border:1px solid #c8d2e6;border-radius:0 0 12px 12px;background:#fff;box-shadow:0 13px 25px rgba(19,36,65,.16)}
+.msm-contact-suggestions[hidden]{display:none}
+.msm-contact-suggestion{display:flex;flex-direction:column;align-items:flex-start;gap:3px;width:100%;min-height:48px;padding:9px 12px;background:#fff;border:0;border-bottom:1px solid #edf0f6;color:#1e2c45;text-align:left;cursor:pointer}
+.msm-contact-suggestion:last-child{border-bottom:0}
+.msm-contact-suggestion[aria-selected="true"],.msm-contact-suggestion:hover{background:#edf3ff}
+.msm-contact-suggestion strong{font-weight:600;font-size:13px;max-width:100%;overflow-wrap:anywhere}
+.msm-contact-suggestion small{color:#5b6d8e;font-size:11px}
+.msm-attachment-drop{display:flex;align-items:center;justify-content:center;min-height:70px;padding:12px;border:1.5px dashed #a5b6d5;border-radius:12px;color:#516684;background:#f6f9ff;text-align:center;font-size:12px;cursor:pointer}
+.msm-attachment-drop.msm-drag-over{background:#e5edff;border-color:#406bea}
+.msm-attachment-drop:focus-visible{outline:3px solid #8da7fb;outline-offset:2px}
+.msm-attachment-selected{display:flex;flex-wrap:wrap;gap:7px}
+.msm-attachment-chip{display:inline-flex;gap:8px;align-items:center;max-width:100%;border:1px solid #d6e0f2;border-radius:8px;padding:4px 6px 4px 9px;background:#fff;color:#263955;font-size:11px}
+.msm-attachment-chip>span{overflow-wrap:anywhere}
+.msm-attachment-chip button{min-width:28px;min-height:28px;border:0;border-radius:7px;background:#eaf0fa;color:#35486c;font-size:18px;cursor:pointer}
+@media(max-width:650px){.msm-contact-suggestions{max-height:min(35dvh,260px)}.msm-attachment-chip{width:100%;justify-content:space-between}.msm-attachment-drop{min-height:78px}}
+@media(prefers-reduced-motion:reduce){.msm-attachment-drop{transition:none}}
