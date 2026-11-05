@@ -30,4 +30,8 @@ assert.ok(source.includes("COUNT(DISTINCT CASE WHEN d.status='delivered'"),"P2 m
 assert.ok(source.includes("HAVING COUNT(*)>1") && source.includes("duplicate_groups"),"P2 must audit duplicate provider event storage keys");
 assert.ok(source.includes("repeat HTTP deliveries may be suppressed before storage"),"P2 event dedup cannot claim to observe attempts suppressed before persistence");
 assert.ok(!/Write-Host[^\\r\\n]*(?:payload_json|provider_event_id|last_error|svix-signature)/i.test(source),"Never print raw webhook metadata, payloads, IDs or signatures");
+assert.ok(source.includes("P2 SCHEDULER LAG AND COMPLETION EVIDENCE"),"P2-04 maintenance lag audit must be present");
+assert.ok(source.includes("distinct_slots_24h") && source.includes("newest_dispatch_age_minutes"),"Scheduler must report distinct slots and last-dispatch age");
+assert.ok(source.includes("Queue pending, retries and DLQ depth: UNKNOWN"),"Do not infer Queue metrics from D1 dispatch claims");
+assert.ok(source.includes("not proof of queue delivery or task completion"),"No false maintenance completion proof");
 console.log("MSM Resend audit PowerShell 5.1 encoding and read-only guard PASS");
