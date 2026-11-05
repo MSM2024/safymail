@@ -2,7 +2,7 @@
 
 **Estado:** P1 código integrado / producción NO certificada.  
 **Entorno objetivo:** mailme.msmmystore.com  
-**Base revisada:** main, `9ff26ef71ac821dcf91d01111e988626c822547d` (PR #38).  
+**Base revisada:** main, `cdd0625058a8f5928c70f392d303e85f8a6f3321` (PR #40).  
 **Regla:** no declarar GO hasta ejecutar y adjuntar evidencia E2E sobre el SHA desplegado.
 
 ## Evidencia de desarrollo
@@ -10,6 +10,8 @@
 - #30–#36: Reply/Reply-All, threading, aislamiento del compositor entre buzones, reenvío de adjuntos, borradores, concurrencia entre dispositivos y lectores read_only.
 - #37: viewport/safe-area móvil. Engineering Gate run #87 PASS (typecheck, tests, PWA, security).
 - #38: conserva el texto de borradores al adjuntar archivos y exige confirmar el descarte. **Merge observado; ejecución CI posterior sin confirmar.**
+- #39: matriz de aceptación de producción, Engineering Gate run #91 PASS.
+- #40: texto de expiración del login ajustado a 12 h absolutas / 2 h de inactividad con regresión incluida; CI PASS y merge confirmado.
 - Sin PR abiertos durante la última consulta del repositorio.
 
 ## Aceptación operativa
@@ -34,6 +36,14 @@ Anotar en cada ejecución: **fecha UTC | SHA desplegado | entorno | actor/rol | 
 | P1-15 | Límites Free Cloudflare/Resend y scheduler/mantenimiento | Cuotas observadas y ejecuciones | BLOCKED |
 
 **BLOCKED** significa “evidencia operativa no obtenida en esta auditoría”, no “funcionalidad fallida”.
+
+## Observación de despliegue — 2026-11-05
+
+- Consulta de la interfaz pública abierta en `https://mailme.msmmystore.com/` mediante sesión de navegador conectada: la pantalla de acceso todavía muestra `expira después de 30 días`.
+- La rama `main`, commit `cdd0625058a8f5928c70f392d303e85f8a6f3321`, muestra el texto corregido `expira a las 12 horas o tras 2 horas de inactividad` y un test automatizado para impedir regresiones.
+- **Diagnóstico:** inconsistencia observable entre la interfaz consultada y `main`. Posibles explicaciones incluyen despliegue anterior, caché del navegador/asset o una versión diferente del frontend. No se ha observado el SHA efectivo del Worker; por tanto **NO afirmar causa raíz**.
+- P1-01 continúa **BLOCKED** hasta confirmar SHA de deployment, invalidación/versión de assets y revisión en sesión limpia. Este control es prioritario antes de cualquier prueba E2E.
+- Las consultas públicas HTTP por el canal externo de lectura no estuvieron disponibles; las pestañas del panel Cloudflare y del diagnóstico autenticado tampoco entregaron contenido. No inferir fallo del servicio ni DNS a partir de estos errores de acceso de herramientas.
 
 ## Política GO/NO-GO
 - **GO** solo si P1-01..15 = PASS, el SHA desplegado tiene CI verde, no hay defectos P0/P1 y se verificaron rutas DNS/Resend.
