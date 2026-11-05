@@ -79,3 +79,39 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,.message:focus-v
   #compose-modal .compose-form{gap:8px}
   #compose-modal .modal-head{min-height:48px}
 }
+
+/* P3 foundation — single responsive workspace, accessible back navigation and compact login. */
+html,body{max-width:100%;overflow-x:hidden}
+.app{min-height:0}
+.main,.content,.list-panel,.reader{min-width:0}
+.topbar .user{min-width:0}
+.user-tools{min-width:0}
+.auth-screen{min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:clamp(12px,3vw,32px);padding-block:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-bottom))}
+.auth-card{max-width:100%;margin:auto;overflow-wrap:anywhere}
+.auth-card input{min-width:0;font-size:16px}
+.search:focus-visible,.auth-card input:focus-visible,.compose-form input:focus-visible,.compose-form textarea:focus-visible{outline:3px solid var(--msm-focus);outline-offset:2px}
+.mobile-back{display:none}
+.modal{max-width:calc(100vw - 16px)}
+@media(max-width:650px){
+  .content{min-height:0;height:calc(100dvh - 58px)}
+  .list-panel,.reader{height:100%;min-height:0}
+  .content:not(.message-open) .list-panel{display:flex}
+  .content:not(.message-open) .reader{display:none}
+  .content.message-open .list-panel{display:none}
+  .content.message-open .reader{display:flex}
+  .content.message-open .reader .mobile-back{display:inline-flex;align-items:center;justify-content:center;min-height:44px;margin-bottom:12px}
+  .messages{min-height:0;max-height:none}
+  .topbar{gap:8px}
+  .topbar .user{gap:6px;flex-wrap:nowrap}
+  .user-tools{gap:4px}
+  .user-tools a,.user-tools button{min-height:36px}
+  .auth-card{width:min(430px,100%);padding:clamp(18px,5vw,28px)}
+  .auth-screen{display:flex;align-items:safe center;justify-content:center}
+}
+@media(max-width:650px) and (max-height:560px){
+  .auth-screen{align-items:flex-start}
+  .auth-card{margin:auto}
+}
+@media(prefers-reduced-motion:reduce){
+  .auth-screen,.auth-card,.btn,.account,.folder,.compose,.message{animation:none!important;transition:none!important}
+}
