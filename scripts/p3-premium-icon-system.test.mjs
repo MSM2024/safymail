@@ -15,7 +15,7 @@ test("icon enhancement script compiles and is present in both applications",()=>
 test("all platform icon placeholders map to a real SVG drawing",()=>{
  const keys=[...web.matchAll(/data-msm-icon="([^"]+)"/g),...admin.matchAll(/data-msm-icon="([^"]+)"/g)].map(x=>x[1]);
  assert.ok(keys.length>=16);
- for(const key of keys)assert.ok(icons.includes(key+":'"),"missing SVG path for "+key);
+ for(const key of keys)assert.ok(icons.includes(key+":'")||icons.includes("'"+key+"':'"),"missing SVG path for "+key);
  assert.ok(icons.includes('aria-hidden="true" focusable="false"'));
  assert.ok(icons.includes('stroke="currentColor"'));
 });
