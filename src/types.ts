@@ -4,6 +4,7 @@ export interface Env {
   MAIL_STORAGE: KVNamespace;
   RESEND_API_KEY?: string;
   CONTROL_PLANE_URL?: string;
+  CONTROL_PLANE_SERVICE?: Fetcher;
   INSTALLATION_ID?: string;
   RESEND_RELAY_TOKEN?: string;
   RESEND_WEBHOOK_SECRET?: string;
