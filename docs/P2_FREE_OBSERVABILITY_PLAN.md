@@ -1,5 +1,9 @@
 # MSM MAIL — P2 Free-first Observability and Release Assurance
 
+> **Cierre administrativo 2026-11-05:** Implementación técnica P2 cerrada para habilitar la ronda UX/UI. Certificación operativa total expresamente diferida; las métricas externas continúan UNKNOWN y el gate global permanece BLOCKED. Acta y traspaso: [P2_ADMINISTRATIVE_CLOSEOUT_AND_P3_UI_HANDOFF.md](./P2_ADMINISTRATIVE_CLOSEOUT_AND_P3_UI_HANDOFF.md).
+
+
+
 **Start:** 2026-11-05
 **Baseline:** P1 accepted functionally, PR #49 merged (`ab474948f40972b922edcfceec89a074b9300065`).
 **Environment:** `mailme.msmmystore.com` / Worker `msm-mail-preview`, Cloudflare Workers Free + D1 + KV + Resend Free.
