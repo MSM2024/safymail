@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { sealCredentials, openCredentials, processProvisioningJob, deriveMaintenanceToken, deriveResendRelayToken, openProvisioningSecret } from "./provisioning-jobs";
+import { sealCredentials, openCredentials, processProvisioningJob, deriveMaintenanceToken, deriveResendRelayToken, openProvisioningSecret, sealSecret } from "./provisioning-jobs";
 import { processMaintenanceBatch } from "./maintenance-jobs";
 import { verifyResendWebhook } from "../../src/email/webhooks";
 
@@ -421,6 +421,64 @@ app.get("/api/installations/:id/runtime-config", async c => {
     maintenance: { url: "https://" + installation.domain + "/api/internal/maintenance", authorization: "Bearer " + token },
     resendRelay: { authorization: "Bearer " + resendRelayToken }
   });
+});
+
+// Recover a pre-existing Resend webhook without deleting, recreating, or rotating it.
+// Admin API authentication is enforced by the /api/* middleware above.
+app.post("/api/installations/:id/resend-webhook-secret", async c => {
+  const installationId = c.req.param("id");
+  if (!/^[a-f0-9-]{16,64}$/i.test(installationId)) return fail(c, 404, "installation_not_found");
+  const raw = await c.req.text();
+  if (enc.encode(raw).byteLength > 4096) return fail(c, 413, "payload_too_large");
+  let body: unknown;
+  try { body = JSON.parse(raw); } catch { return fail(c, 400, "invalid_json"); }
+  const secret = (body && typeof body === "object" && "signing_secret" in body)
+    ? (body as { signing_secret?: unknown }).signing_secret : undefined;
+  if (typeof secret !== "string" || !/^whsec_[A-Za-z0-9_=-]{16,512}$/.test(secret)) {
+    return fail(c, 400, "invalid_webhook_signing_secret");
+  }
+  const installation = await c.env.CONTROL_DB.prepare(
+    "SELECT id,status,current_step,provider_account_id FROM control_installations WHERE id=?"
+  ).bind(installationId).first<{ id: string; status: string; current_step: string; provider_account_id: string | null }>();
+  if (!installation) return fail(c, 404, "installation_not_found");
+  if (installation.status !== "failed" || installation.current_step !== "resend_domain_ready" || !installation.provider_account_id) {
+    return fail(c, 409, "installation_not_eligible_for_webhook_recovery");
+  }
+  const providerAccountId = installation.provider_account_id;
+  const provider = await c.env.CONTROL_DB.prepare(
+    "SELECT status,webhook_endpoint FROM control_provider_accounts WHERE id=?"
+  ).bind(providerAccountId).first<{ status: string; webhook_endpoint: string | null }>();
+  if (!provider || provider.status !== "active" || !provider.webhook_endpoint) return fail(c, 409, "provider_account_not_ready");
+  const [existingShared, existingInstallation] = await Promise.all([
+    c.env.CONTROL_DB.prepare(
+      "SELECT provider_account_id FROM control_provider_secrets WHERE provider_account_id=? AND secret_name='RESEND_WEBHOOK_SECRET'"
+    ).bind(providerAccountId).first(),
+    c.env.CONTROL_DB.prepare(
+      "SELECT installation_id FROM control_secrets WHERE installation_id=? AND secret_name='RESEND_WEBHOOK_SECRET'"
+    ).bind(installationId).first()
+  ]);
+  if (existingShared || existingInstallation) return fail(c, 409, "webhook_secret_already_configured");
+
+  const shared = await sealSecret(c.env.CONTROL_PLANE_VAULT_KEY, secret, providerAccountId + ":RESEND_WEBHOOK_SECRET");
+  const scoped = await sealSecret(c.env.CONTROL_PLANE_VAULT_KEY, secret, installationId + ":RESEND_WEBHOOK_SECRET");
+  try {
+    // Both vault envelopes are written in a single D1 transaction.
+    // No secret value is included in the API response or audit record.
+    await c.env.CONTROL_DB.batch([
+      c.env.CONTROL_DB.prepare(
+        "INSERT INTO control_provider_secrets(provider_account_id,secret_name,ciphertext,nonce,algorithm,updated_at) VALUES (?,'RESEND_WEBHOOK_SECRET',?,?,'AES-GCM-256',strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
+      ).bind(providerAccountId, shared.ciphertext, shared.nonce),
+      c.env.CONTROL_DB.prepare(
+        "INSERT INTO control_secrets(installation_id,secret_name,ciphertext,nonce,algorithm,updated_at) VALUES (?,'RESEND_WEBHOOK_SECRET',?,?,'AES-GCM-256',strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
+      ).bind(installationId, scoped.ciphertext, scoped.nonce),
+      c.env.CONTROL_DB.prepare(
+        "INSERT INTO control_audit_logs(id,installation_id,action,outcome,metadata_json) VALUES (?,?,'webhook.secret.recovered','success','{}')"
+      ).bind(id(),installationId)
+    ]);
+  } catch {
+    return fail(c, 409, "webhook_secret_import_conflict");
+  }
+  return c.json({ configured: true, installationId, secretName: "RESEND_WEBHOOK_SECRET" }, 201);
 });
 
 app.get("/api/installations/:id/secrets/:name/status", async c => {
