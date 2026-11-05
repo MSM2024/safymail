@@ -1,0 +1,82 @@
+{
+  "schema": "msm-mail-p1-manual-v1",
+  "checks": [
+    {
+      "id": "P1-08",
+      "result": "PENDING",
+      "evidenceMode": "pending",
+      "observedAtUtc": "",
+      "deviceCategory": "",
+      "roleCategory": "",
+      "expected": "",
+      "observed": "",
+      "evidenceRef": ""
+    },
+    {
+      "id": "P1-09",
+      "result": "PENDING",
+      "evidenceMode": "pending",
+      "observedAtUtc": "",
+      "deviceCategory": "",
+      "roleCategory": "",
+      "expected": "",
+      "observed": "",
+      "evidenceRef": ""
+    },
+    {
+      "id": "P1-10",
+      "result": "PENDING",
+      "evidenceMode": "pending",
+      "observedAtUtc": "",
+      "deviceCategory": "",
+      "roleCategory": "",
+      "expected": "",
+      "observed": "",
+      "evidenceRef": ""
+    },
+    {
+      "id": "P1-11",
+      "result": "PENDING",
+      "evidenceMode": "pending",
+      "observedAtUtc": "",
+      "deviceCategory": "",
+      "roleCategory": "",
+      "expected": "",
+      "observed": "",
+      "evidenceRef": ""
+    },
+    {
+      "id": "P1-12",
+      "result": "PENDING",
+      "evidenceMode": "pending",
+      "observedAtUtc": "",
+      "deviceCategory": "",
+      "roleCategory": "",
+      "expected": "",
+      "observed": "",
+      "evidenceRef": ""
+    },
+    {
+      "id": "P1-13",
+      "result": "PENDING",
+      "evidenceMode": "pending",
+      "observedAtUtc": "",
+      "deviceCategory": "",
+      "roleCategory": "",
+      "expected": "",
+      "observed": "",
+      "evidenceRef": ""
+    },
+    {
+      "id": "P1-14",
+      "result": "PENDING",
+      "evidenceMode": "pending",
+      "observedAtUtc": "",
+      "deviceCategory": "",
+      "roleCategory": "",
+      "expected": "",
+      "observed": "",
+      "evidenceRef": ""
+    }
+  ]
+}

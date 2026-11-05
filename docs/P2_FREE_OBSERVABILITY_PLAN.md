@@ -109,6 +109,12 @@ A real rollback is a privileged production change: document intended known-good 
 
 To avoid mixing partial and full assurance, the global P2 gate returns **BLOCKED** when any control is absent, stale (older than 24 hours), unverified, unknown, or missing a safe evidence description. This does not block ongoing mail operations; it blocks claiming final P2 certification.
 
+## P2-06 / P2-07 executable safeguards — 2026-11-05
+
+- `docs/P2_P1_MANUAL_EVIDENCE_TEMPLATE.json` deliberately starts with P1-08..P1-14 `PENDING`. Copy to a private local file outside Git. Each result records device/role category, expected and observed behavior, UTC timestamp and redacted evidence reference. `npm run qa:p2:p1:manual -- <absolute-private-file.json>` returns PASS only for all seven **instrumented** real observations. Historical operator-reported P1 acceptance stays accepted functionally but **does not become instrumented** simply by copying a statement into a template.
+- `npm run qa:p2:release:preflight -- 94a7ed90-9478-4cc6-b339-97d6ca23d2b4` is a *read-only* metadata preflight. It verifies a clean tracked worktree, published release-manifest consistency and authenticated active Cloudflare Worker version (100% traffic) through existing scripts. It neither deploys nor rolls back. Output `PASS-METADATA-ONLY` explicitly does **not** certify a running bundle digest, production E2E or a successful rollback rehearsal. The expected ID is an observation from 2026-11-05; replace it whenever an authorized deployment changes.
+- The global P2 evidence gate remains separately **BLOCKED** until provider account usage, Cloudflare Queues/DLQ, resource budgets, human test ledger, bundle attestation and rollback readiness are independently verified. Do not mark an unknown field as PASS.
+
 ## Hard safety conditions
 
 - A successful CI suite is not an authenticated production E2E certificate.
