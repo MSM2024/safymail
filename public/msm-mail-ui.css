@@ -448,3 +448,17 @@ html,body{max-width:100%;overflow-x:hidden}
  .topbar .user #logout .msm-icon{width:20px;height:20px;flex-basis:20px}
 }
 @media(prefers-reduced-motion:reduce){.msm-search-wrap .search{transition:none}}
+
+/* P3 release refinement: active navigation and compact icon action discoverability. */
+.sidebar .folder[aria-current="page"]{
+  color:#fff;background:#203f61;border-color:#426787;
+  box-shadow:inset 3px 0 #39d1f1;
+}
+.sidebar .folder[aria-current="page"] .folder-icon{color:#7fe5f5}
+.topbar #install-app:focus-visible,.topbar #logout:focus-visible,
+.mobile-menu:focus-visible{outline:3px solid #168cad;outline-offset:2px}
+#list-status[role="status"]{min-height:22px}
+@media(max-width:390px){
+ .topbar #install-app,.topbar #logout{position:relative}
+ .topbar #install-app .msm-icon,.topbar #logout .msm-icon{opacity:1}
+}
