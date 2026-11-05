@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {classify, verify, comparePublicShells, EXPECTED, OLD} from "./verify-public-deploy.mjs";
+import {classify, verify, comparePublicShells, classifyRedirect, EXPECTED, OLD} from "./verify-public-deploy.mjs";
 
 test("classifies current, stale and unknown public login shells", () => {
   assert.equal(classify("<html>" + EXPECTED + "</html>"), "current");
@@ -42,4 +42,18 @@ test("comparative probe uses fixed public routes and reports stale variants", as
   assert.deepEqual(seen.map(item => new URL(item.url).pathname), ["/","/index.html","/index.html"]);
   assert.ok(seen.every(item => item.init.redirect === "manual" && item.init.cache === "no-store"));
   assert.ok(seen.every(item => new URL(item.url).hostname === "mailme.msmmystore.com"));
+});
+
+test("classifies same-origin canonical 307 as redirect rather than failure", async () => {
+  const results = await comparePublicShells(async (url) => {
+    if (new URL(url).pathname === "/index.html") return new Response("", {status:307,headers:{Location:"/"}});
+    return new Response("<html>" + EXPECTED + "</html>", {headers:{"Content-Type":"text/html"}});
+  });
+  assert.deepEqual(results.map(item => item.result), ["current","canonical-redirect","canonical-redirect"]);
+  assert.equal(classifyRedirect(new Response("",{status:307,headers:{Location:"https://evil.example/"}}), TARGET), "unexpected-redirect");
+  assert.equal(classifyRedirect(new Response("",{status:307}), TARGET), "redirect-missing-location");
+});
+
+test("rejects redirects to other same-origin destinations", () => {
+  assert.equal(classifyRedirect(new Response("",{status:307,headers:{Location:"/admin"}}), TARGET), "unexpected-redirect");
 });
