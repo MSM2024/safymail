@@ -33,6 +33,20 @@ export async function verify(target = TARGET, fetchFn = fetch) {
   };
 }
 
+export function classifyRedirect(response, requestUrl) {
+  if (response.status !== 301 && response.status !== 302 && response.status !== 307 && response.status !== 308) return null;
+  const location = response.headers.get("location");
+  if (!location) return "redirect-missing-location";
+  try {
+    const redirected = new URL(location, requestUrl);
+    const expected = new URL(TARGET);
+    return redirected.origin === expected.origin && redirected.pathname === "/" && !redirected.search
+      ? "canonical-redirect" : "unexpected-redirect";
+  } catch {
+    return "invalid-redirect";
+  }
+}
+
 export async function comparePublicShells(fetchFn = fetch) {
   // Fixed-origin read-only probes; query parameters can be normalized by cache rules.
   const paths = ["/", "/index.html", "/index.html?msm_p1_probe=20261105"];
@@ -46,9 +60,10 @@ export async function comparePublicShells(fetchFn = fetch) {
     });
     const text = response.ok && (response.headers.get("content-type") || "").toLowerCase().includes("text/html")
       ? await response.text() : "";
+    const redirected = classifyRedirect(response, target);
     results.push({
       path, status: response.status,
-      result: response.ok ? classify(text) : "http-error",
+      result: redirected || (response.ok ? classify(text) : "http-error"),
       cfCacheStatus: response.headers.get("cf-cache-status") || "not-reported",
       cacheControl: response.headers.get("cache-control") || "not-reported",
       age: response.headers.get("age") || "not-reported",
@@ -63,11 +78,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     console.log("MSM MAIL public deployment check:", JSON.stringify(result));
     const variants = await comparePublicShells();
     console.log("MSM MAIL multi-path cache diagnosis:", JSON.stringify(variants));
-    if (result.result !== "current" || variants.some(item => item.result !== "current")) {
-      console.error("P1-01 BLOCKED: a public page differs from main or was unavailable. Check deployment SHA, cache rules and targeted purge only after deployment is verified.");
+    if (result.result !== "current" || variants.some(item => item.result !== "current" && item.result !== "canonical-redirect")) {
+      console.error("P1-01 BLOCKED: root HTML is stale, an unexpected response occurred, or public content differs from main. Confirm Worker deployment SHA and asset version before any targeted cache purge.");
       process.exitCode = 1;
     } else {
-      console.log("Public login copy matches main on all routes; verify deployed Worker SHA and authenticated E2E separately.");
+      console.log("Public login copy matches main on canonical routes (or /index.html redirects safely to /); verify deployed Worker SHA and authenticated E2E separately.");
     }
   } catch (error) {
     console.error("P1-01 BLOCKED: public deployment fetch unavailable:", error instanceof Error ? error.message : String(error));
