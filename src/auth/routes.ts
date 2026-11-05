@@ -118,10 +118,10 @@ auth.post("/mfa/verify", async c => {
   if(!token||!/^[A-Za-z0-9_-]{40,64}$/.test(token))return c.json({error:"mfa_challenge_expired"},401);
   const tokenHash=await sha256Hex(token);
   const challenge=await c.env.DB.prepare(
-    `SELECT ch.id,ch.user_id,ch.expires_at,ch.attempts,u.email,u.display_name,u.totp_secret_ciphertext,u.totp_last_counter
+    `SELECT ch.id,ch.user_id,ch.expires_at,ch.attempts,u.email,u.display_name,u.is_superadmin,u.totp_secret_ciphertext,u.totp_last_counter
      FROM auth_mfa_challenges ch JOIN users u ON u.id=ch.user_id
      WHERE ch.token_hash=? AND ch.expires_at>? AND u.status='active' AND u.totp_enabled_at IS NOT NULL LIMIT 1`
-  ).bind(tokenHash,new Date().toISOString()).first<{id:string;user_id:string;expires_at:string;attempts:number;email:string;display_name:string;totp_secret_ciphertext:string|null;totp_last_counter:number|null}>();
+  ).bind(tokenHash,new Date().toISOString()).first<{id:string;user_id:string;expires_at:string;attempts:number;email:string;display_name:string;is_superadmin:number;totp_secret_ciphertext:string|null;totp_last_counter:number|null}>();
   if(!challenge||challenge.attempts>=5)return c.json({error:"mfa_challenge_expired"},401);
   const body=await c.req.json<{code?:string}>().catch(()=>({} as any)), code=typeof body.code==="string"?body.code.trim():"";
   let valid=false;
@@ -161,7 +161,7 @@ auth.post("/mfa/verify", async c => {
   if(usedBackupCode)await c.env.DB.prepare("INSERT INTO audit_logs(id,actor_user_id,action,resource_type,resource_id) VALUES(?,?,'auth.backup_code_used','user',?)")
     .bind(crypto.randomUUID(),challenge.user_id,challenge.user_id).run();
   await c.env.DB.prepare("UPDATE users SET last_login_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?").bind(challenge.user_id).run();
-  return c.json({user:{id:challenge.user_id,email:challenge.email,displayName:challenge.display_name,isSuperadmin:true,mfaEnabled:true}});
+  return c.json({user:{id:challenge.user_id,email:challenge.email,displayName:challenge.display_name,isSuperadmin:challenge.is_superadmin===1,mfaEnabled:true}});
 });
 
 auth.post("/logout",async c=>{await revokeSession(c);c.header("Set-Cookie",MFA_COOKIE+"=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict",{append:true});return c.json({ok:true});});
