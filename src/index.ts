@@ -3,7 +3,7 @@ import { receiveEmail } from "./email/inbound";
 import { arrayBufferToBase64, isAllowedAttachment, parseOutboundAttachments } from "./email/attachments";
 import { releaseMailStorage, reserveMailStorage } from "./email/storage";
 import { verifyResendWebhook } from "./email/webhooks";
-import { sendViaResendRelay } from "./email/resend-relay";
+import { sendViaResendRelay, diagnoseRelayConnectivity } from "./email/resend-relay";
 import { getOutboundPreflight } from "./email/outbound-preflight";
 import { requireSession, getUserCompanies, hashPassword } from "./middleware/auth";
 import { authRoutes } from "./auth/routes";
@@ -1192,6 +1192,16 @@ app.get("/api/sending/readiness", async (c) => {
   if (!account) return c.json({ready:false,transport:"resend_relay",reason:"account_or_domain_not_ready"});
   const preflight = getOutboundPreflight(c.env);
   return c.json({...preflight,account_id:accountId});
+});
+
+// Authorized, read-only Worker-to-Worker network diagnostic. Never sends mail.
+app.get("/api/sending/diagnostic", async (c) => {
+  const accountId = (c.req.query("account_id") || "").trim();
+  if (!accountId || accountId.length > 128) return c.json({error:"invalid_account_id"},400);
+  const account = await getSendAccount(c,accountId,c.get("user"));
+  if (!account) return c.json({error:"account_or_domain_not_ready"},403);
+  const diagnostic = await diagnoseRelayConnectivity(c.env);
+  return c.json({transport:"resend_relay",...diagnostic});
 });
 
 app.post("/api/messages/send", async (c) => {
