@@ -1,8 +1,12 @@
+import { resolveMailWebhookRoute } from "./webhook-forwarding";
 import { deriveMaintenanceTokens } from "./provisioning-jobs";
 
 export interface MaintenanceJobEnv {
   CONTROL_DB: D1Database;
   CONTROL_PLANE_VAULT_KEY: string;
+  MAIL_DELIVERY_SERVICE?: Fetcher;
+  MAIL_DELIVERY_DOMAIN?: string;
+  MAIL_DELIVERY_HOST?: string;
 }
 
 export async function processMaintenanceBatch(env: MaintenanceJobEnv, installationIds: string[], slot: string): Promise<void> {
@@ -17,8 +21,12 @@ export async function processMaintenanceBatch(env: MaintenanceJobEnv, installati
   const tokens = await deriveMaintenanceTokens(env.CONTROL_PLANE_VAULT_KEY, installations.map(item => item.id));
   const outcomes = await Promise.all(installations.map(async (installation, index) => {
     const token = tokens[index];
-    const endpoint = new URL("/api/internal/maintenance", "https://" + installation.domain);
-    const response = await fetch(endpoint.toString(), {
+    const route = resolveMailWebhookRoute(installation.domain, env.MAIL_DELIVERY_DOMAIN, env.MAIL_DELIVERY_HOST);
+    const endpoint = new URL("/api/internal/maintenance", route.useBinding ? route.url : "https://" + installation.domain);
+    const sender = route.useBinding && env.MAIL_DELIVERY_SERVICE
+      ? env.MAIL_DELIVERY_SERVICE.fetch.bind(env.MAIL_DELIVERY_SERVICE)
+      : fetch;
+    const response = await sender(endpoint.toString(), {
       method: "POST",
       headers: { Authorization: "Bearer " + token, "Content-Type": "application/json", "X-Mail-Center-Scheduler-Slot": slot },
       body: "{}",
