@@ -45,3 +45,6 @@ __pycache__/
 *.backup-*
 /MSM-MAIL-AUDIT-RECOVERY.ps1
 /msm-mail-*.py
+
+# Generated release manifest; never commit stale deployment metadata
+/public/msm-release.json
