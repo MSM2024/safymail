@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Env, AppVariables } from "../types";
 import { getSessionToken, hashPassword, verifyPassword } from "../middleware/auth";
+import { LIST_ACTIVE_SESSIONS_SQL, REVOKE_OTHER_SESSIONS_SQL } from "./session-control";
 import { createOtpAuthUri, decryptTotpSecret, encryptTotpSecret, generateBackupCodes, generateTotpSecret, hashBackupCode, matchTotpCounter } from "./totp";
 
 const security = new Hono<{ Bindings: Env; Variables: AppVariables }>();
@@ -62,6 +63,47 @@ security.post("/password", async (c) => {
       .bind(crypto.randomUUID(), user.id, user.id)
   ]);
   return c.json({ password_updated: true, other_sessions_revoked: true });
+});
+
+security.get("/sessions", async (c) => {
+  const token = getSessionToken(c.req.raw);
+  if (!token) return c.json({ error: "session_required" }, 401);
+  const tokenHash = base64Url(await digest(token));
+  const now = new Date();
+  const result = await c.env.DB.prepare(LIST_ACTIVE_SESSIONS_SQL)
+    .bind(tokenHash,c.get("user").id,now.toISOString(),
+      new Date(now.getTime()-2*60*60*1000).toISOString())
+    .all();
+  return c.json({ sessions: (result.results || []).map((row: any) => ({
+    id: row.id, last_seen_at: row.last_seen_at,
+    expires_at: row.expires_at, is_current: row.is_current === 1
+  })) });
+});
+
+security.post("/sessions/revoke-others", async (c) => {
+  const user = c.get("user");
+  const body = await c.req.json<{current_password?:string}>().catch(() => ({} as any));
+  if (typeof body.current_password !== "string" || !body.current_password || body.current_password.length > 256) {
+    return c.json({error:"invalid_credentials"},401);
+  }
+  const currentToken = getSessionToken(c.req.raw);
+  if (!currentToken) return c.json({error:"session_required"},401);
+  const row = await c.env.DB.prepare(
+    "SELECT password_hash,password_salt,totp_enabled_at FROM users WHERE id=? AND status='active'"
+  ).bind(user.id).first<{password_hash:string|null;password_salt:string|null;totp_enabled_at:string|null}>();
+  if (!row?.password_hash || !row.password_salt ||
+      !await verifyPassword(body.current_password,row.password_salt,row.password_hash)) {
+    return c.json({error:"invalid_credentials"},401);
+  }
+  if (row.totp_enabled_at && !user.mfaVerified) return c.json({error:"mfa_verification_required"},403);
+  const tokenHash = base64Url(await digest(currentToken));
+  const statements = await c.env.DB.batch([
+    c.env.DB.prepare(REVOKE_OTHER_SESSIONS_SQL).bind(user.id,tokenHash),
+    c.env.DB.prepare(
+      "INSERT INTO audit_logs(id,actor_user_id,action,resource_type,resource_id) VALUES(?,?,'auth.other_sessions_revoked','user',?)"
+    ).bind(crypto.randomUUID(),user.id,user.id)
+  ]);
+  return c.json({other_sessions_revoked:true,revoked_count:statements[0]?.meta.changes??0});
 });
 
 security.post("/totp/enroll", async (c) => {
