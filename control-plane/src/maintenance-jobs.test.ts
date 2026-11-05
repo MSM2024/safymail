@@ -56,3 +56,28 @@ test("maintenance dispatch rejects oversized batches before querying installatio
   );
   assert.equal(queried, false);
 });
+
+test("maintenance uses MSM scoped service binding and mailme host, not apex or public fetch", async () => {
+  const previousFetch = globalThis.fetch;
+  const calls: Array<{url:string; auth:string|null; redirect:RequestRedirect|undefined}> = [];
+  globalThis.fetch = (async () => { throw new Error("public fetch must not be used"); }) as typeof fetch;
+  try {
+    await processMaintenanceBatch({
+      CONTROL_DB: fakeDb([{id: installationId,domain:"msmmystore.com"}]),
+      CONTROL_PLANE_VAULT_KEY: vault,
+      MAIL_DELIVERY_DOMAIN:"msmmystore.com",
+      MAIL_DELIVERY_HOST:"mailme.msmmystore.com",
+      MAIL_DELIVERY_SERVICE: {
+        fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
+          calls.push({url:String(input),auth:new Headers(init?.headers).get("Authorization"),redirect:init?.redirect});
+          return new Response("{}",{status:200});
+        }
+      } as unknown as Fetcher
+    },[installationId],"2026-11-03T12:30:00.000Z");
+    assert.deepEqual(calls, [{
+      url:"https://mailme.msmmystore.com/api/internal/maintenance",
+      auth:"Bearer "+await deriveMaintenanceToken(vault,installationId),
+      redirect:"manual"
+    }]);
+  } finally {globalThis.fetch=previousFetch;}
+});
