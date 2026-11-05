@@ -1,6 +1,6 @@
 # MSM MAIL — P1 Engineering Closeout & Production Acceptance
 
-**Estado:** P1 código integrado / producción NO certificada.  
+**Estado:** P1 funcional cerrado por aceptación del operador / certificación de producción integral pendiente.  
 **Entorno objetivo:** mailme.msmmystore.com  
 **Base revisada:** main, `cdd0625058a8f5928c70f392d303e85f8a6f3321` (PR #40).  
 **Regla:** no declarar GO hasta ejecutar y adjuntar evidencia E2E sobre el SHA desplegado.
@@ -78,6 +78,32 @@ Anotar en cada ejecución: **fecha UTC | SHA desplegado | entorno | actor/rol | 
 **Política:** no confundir la suite CI verde con entrega, persistencia o roles certificados en producción. P1-04/P1-06 tienen **PASS manual reportado** y pendientes de trazabilidad; P1-01 tiene **PASS parcial** (salud/bindings públicos) pendiente de procedencia binaria del bundle. P1-02 migraciones pendientes cero, pendiente de cotejo estructural. P1-03 DNS y routing evidenciados, pendiente de inspección íntegra de reglas y trazas de mail.
 
 **Próxima certificación:** obtener evidencia anonimizada y ejecutable de los controles de la tabla en sesión autorizada, sin reutilizar tokens de bootstrap, sin alterar DNS de forma automática y sin enviar a destinatarios no autorizados.
+
+
+## Acta de cierre funcional P1 — 2026-11-05
+
+**Decisión:** P1 **CERRADO POR ACEPTACIÓN DEL OPERADOR (alcance funcional)**. El operador comunica que completó satisfactoriamente las pruebas manuales de borradores, adjuntos sin envío, Spam/Papelera, MFA/permisos, concurrencia y responsive, además de las pruebas reales de envío y recepción informadas anteriormente. Esta declaración se registra como **PASS manual reportado por el operador** y no como resultado instrumentado del agente.
+
+**Evidencia automatizada y remota contrastada:**
+- GitHub Actions Engineering Gate PASS: 133 pruebas de código + 9 pruebas del verificador público; typecheck, validación de seguridad y PWA satisfactorios.
+- `validate:migrations`: 22 migraciones de correo y 10 del control plane validadas en contexto de prueba.
+- Ambos D1 remotos (`msm-mail-preview-db` y `msm-mail-control-db`): `No migrations to apply!` en comprobaciones separadas.
+- `qa:p1:public-deploy`: HTML `current`, HTTP 200 y redirecciones canónicas 307; `/api/health` en estado `ok`, control de acceso anónimo 401.
+- D1 remoto: dominio `active`, `resend_status=verified`, flags de entrada y salida = 1. Control Plane: instalación `ready`, proveedor `active`.
+- DNS MX/SPF/DMARC presentes; fallo de detector DMARC corregido en PR #48. Cloudflare Email Routing Catch-all activo hacia `msm-mail-preview`. Resend Domains `Verified`.
+- Diagnóstico relay: `ready=true`, `reachable=true`, `bindingPresent=true`; operador confirma envío de prueba recibido en Gmail y recepción externa.
+- Auditoría Resend **sin envío**: consumo local D1 de `3/100` día UTC y `3/3000` mes UTC, en la lectura reportada. Este contador **no refleja envíos externos a Mail Center** ni garantiza cuota restante global en la cuenta Resend.
+
+**Controles aceptados como pruebas manuales reportadas:** P1-04/06 (envío y recepción), P1-08/09/10/11/12/13/14 (funcionalidad). Las pruebas automatizadas cubren los contratos de P1-07 y P1-15; no se afirma que el operador haya reproducido eventos de rebote/duplicado en proveedor o medido mantenimiento real.
+
+**Deuda de certificación técnica trasladada a P2 / checklist de hardening (sin atribuir resultados ficticios):**
+1. Proveniencia del bundle publicado: confirmar de manera verificable la identidad Git SHA ↔ Cloudflare Worker Version ID (el historial muestra `Source: Unknown`).
+2. Webhook Resend en operación real: recolectar eventos anonimizados `delivered/bounced/failed`, firma, idempotencia y reconciliación; sin generar envíos adicionales solo para certificar.
+3. Registrar evidencias anonimizadas de pruebas manuales P1-08 a P1-14 y los resultados por usuario/rol, dispositivo y fecha; no se aportaron trazas instrumentadas.
+4. Auditar consumo total real de Resend desde panel proveedor, y ejecución/observabilidad de scheduler, mantenimiento, DLQ, límites Cloudflare Free.
+5. Contrastar el historial y esquema D1 remoto, más persistencia D1/KV y trazabilidad de la entrega, con evidencia anonimizada.
+
+**Criterio de alcance:** este cierre es **administrativo/funcional por aceptación del propietario**, no un certificado de producción exhaustivo ni un GO técnico irrestricto. La política GO/NO-GO estricta de este documento continúa aplicando a cualquier promoción o certificación de producción. No se hizo despliegue, cambio de DNS, envío de correo ni mutación de D1 como parte de esta acta.
 
 ## Política GO/NO-GO
 - **GO** solo si P1-01..15 = PASS, el SHA desplegado tiene CI verde, no hay defectos P0/P1 y se verificaron rutas DNS/Resend.
