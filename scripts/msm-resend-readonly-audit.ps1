@@ -91,4 +91,46 @@ try {
    }
  }
 }catch{Write-Host "Resend quota read-only query failed" -ForegroundColor Yellow}
+Write-Host ""
+Write-Host "=== P2 WEBHOOK DELIVERY COUNTS (READ-ONLY, NO MESSAGE DATA) ==="
+try {
+ $webhookSql="SELECT COALESCE(SUM(CASE WHEN d.status='pending' THEN 1 ELSE 0 END),0) AS pending,COALESCE(SUM(CASE WHEN d.status='delivered' THEN 1 ELSE 0 END),0) AS delivered,COALESCE(SUM(CASE WHEN d.attempts>1 THEN 1 ELSE 0 END),0) AS retried,COALESCE(MAX(d.attempts),0) AS max_attempts FROM control_webhook_deliveries d JOIN control_installations i ON i.id=d.installation_id WHERE i.domain='$domainSafe';"
+ $webhookOut=& npx --no-install wrangler d1 execute msm-mail-control-db --config wrangler.control-plane.toml --remote --json --command $webhookSql 2>$null
+ if($LASTEXITCODE -ne 0){Write-Host "Webhook counters unavailable" -ForegroundColor Yellow}
+ else {
+   $webhookJson=$webhookOut|Out-String|ConvertFrom-Json
+   $webhookRow=@(@($webhookJson)[0].results)[0]
+   if($null -eq $webhookRow -or $null -eq $webhookRow.pending){Write-Host "Webhook counters not parseable" -ForegroundColor Yellow}
+   else{
+     Write-Host ("Pending: {0} | Delivered to Worker: {1} | Retried: {2} | Max attempts: {3}" -f $webhookRow.pending,$webhookRow.delivered,$webhookRow.retried,$webhookRow.max_attempts)
+     Write-Host "Delivered here means webhook forwarded to Worker, not email delivered to recipient."
+     if([int]$webhookRow.pending -gt 0){Write-Host "CAUTION: inspect pending webhook deliveries without changing them." -ForegroundColor Yellow}
+   }
+ }
+}catch{Write-Host "Webhook aggregate query unavailable" -ForegroundColor Yellow}
+Write-Host ""
+Write-Host "=== P2 MAINTENANCE DISPATCH AND LOCK (READ-ONLY) ==="
+try{
+ $dispatchSql="SELECT COUNT(*) AS dispatched_24h,MAX(m.scheduled_slot) AS last_dispatched_slot FROM control_maintenance_dispatches m JOIN control_installations i ON i.id=m.installation_id WHERE i.domain='$domainSafe' AND m.scheduled_slot>=strftime('%Y-%m-%dT%H:%M:%fZ','now','-24 hours');"
+ $dispatchOut=& npx --no-install wrangler d1 execute msm-mail-control-db --config wrangler.control-plane.toml --remote --json --command $dispatchSql 2>$null
+ if($LASTEXITCODE -ne 0){Write-Host "Maintenance dispatch query unavailable" -ForegroundColor Yellow}
+ else{
+   $dispatchJson=$dispatchOut|Out-String|ConvertFrom-Json
+   $dispatchRow=@(@($dispatchJson)[0].results)[0]
+   if($null -eq $dispatchRow -or $null -eq $dispatchRow.dispatched_24h){Write-Host "Maintenance dispatch not parseable" -ForegroundColor Yellow}
+   else{Write-Host ("Dispatches last 24h: {0} | Last dispatched slot: {1}" -f $dispatchRow.dispatched_24h,$dispatchRow.last_dispatched_slot)}
+ }
+}catch{Write-Host "Maintenance dispatch unavailable" -ForegroundColor Yellow}
+try{
+ $lockSql="SELECT COALESCE(last_completed_slot,'not-recorded') AS last_completed_slot,CASE WHEN lock_token IS NOT NULL AND lock_expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now') THEN 1 ELSE 0 END AS lock_active FROM mail_maintenance_lock WHERE id=1;"
+ $lockOut=& npx --no-install wrangler d1 execute msm-mail-preview-db --config wrangler.toml --remote --json --command $lockSql 2>$null
+ if($LASTEXITCODE -ne 0){Write-Host "Mail maintenance lock query unavailable" -ForegroundColor Yellow}
+ else{
+   $lockJson=$lockOut|Out-String|ConvertFrom-Json
+   $lockRow=@(@($lockJson)[0].results)[0]
+   if($null -eq $lockRow){Write-Host "Mail maintenance lock not found" -ForegroundColor Yellow}
+   else{Write-Host ("Last completed slot: {0} | Lock active: {1}" -f $lockRow.last_completed_slot,$lockRow.lock_active)}
+ }
+}catch{Write-Host "Mail maintenance lock unavailable" -ForegroundColor Yellow}
+Write-Host "A dispatch record does not prove maintenance completion; review both slots."
 Write-Host "AUDIT COMPLETE - No changes or email sends were performed." -ForegroundColor Green
