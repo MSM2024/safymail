@@ -1,0 +1,41 @@
+# MSM MAIL — P2 Free-first Observability and Release Assurance
+
+**Start:** 2026-11-05
+**Baseline:** P1 accepted functionally, PR #49 merged (`ab474948f40972b922edcfceec89a074b9300065`).
+**Environment:** `mailme.msmmystore.com` / Worker `msm-mail-preview`, Cloudflare Workers Free + D1 + KV + Resend Free.
+**Delivery policy:** No DNS mutations, mail sends, migration applies, secret rotation, deployment or cache purges during read-only discovery. No live test emails merely to prove observability.
+
+## Priorities and evidence gates
+
+| ID | Objective | Read-only evidence and safe mechanism | Acceptance |
+|---|---|---|---|
+| P2-01 | Verifiable Git SHA ↔ Worker version mapping | Introduce build provenance only in a reviewed deployment flow; record release Git SHA, Wrangler Worker version ID and asset fingerprint together. Do not equate `Source: Unknown` with a known commit. | Machine-verifiable metadata from deployed Worker and matching release artifact, plus CI PASS |
+| P2-02 | Resend quota budget across provider account | Compare Control Plane shared reservation ledger `reserved/sent/uncertain` against Resend provider account usage. Existing read-only PowerShell audit reports **local** reservations only. | Daily/monthly figures + UTC timestamps + explicit external usage delta; alerts before hard limits |
+| P2-03 | Webhook traceability and dedup | Read `control_webhook_events`, `control_webhook_deliveries` and safe aggregate statuses; no message content, tokens or identifiers in public logs. | Actual event lineage, duplicate handling, delivered/failed status reconciled without sending test mail |
+| P2-04 | Scheduler/Queue and D1 lock health | Read job states, DLQ counts and `mail_maintenance_lock.last_completed_slot` through authenticated, read-only admin/audit tooling. | Evidence of last successful slot, failures, queue backlog and idempotent repetition |
+| P2-05 | Operational Cloudflare Free budgets | Inspect Workers requests, D1 reads/writes/storage, KV usage, Queue operations and CPU p95 from provider dashboards. | Thresholds documented, no automatic billing enablement or speculative free headroom |
+| P2-06 | P1 manual evidence ledger | Record anonymized operator attestations (test type, expected/observed state, timestamp, role/device) without message content or credentials. | Reproducible summary for P1-08..14, distinct from CI tests |
+| P2-07 | Release safety | Document rollback route and preflight gates with correct Wrangler configuration and no secret exposure. | Release checklist, controlled staged promotion and rollback drill without affecting active mail |
+
+## Existing verified baseline
+
+- D1 production-oriented remote checks for both databases: `No migrations to apply!`; this does not prove every table is intact.
+- `/api/health`: `ok` in `preview`, public HTML `current`, correct canonical redirects, private endpoint anonymous request 401.
+- Cloudflare Email Routing catch-all active → `msm-mail-preview`; domain inbound/outbound verified by D1; provider Resend reported `Verified`.
+- Operator reports successful delivery and reception, MFA, draft, concurrency, permissions, Spam/Trash and responsive tests.
+- Shared Resend ledger observation at last audit: **3/100 daily** and **3/3000 monthly** (UTC), not total Resend account usage and not a live guarantee of remaining quota.
+- Engineering Gate PASS and 133 automated tests + 9 public-probe tests on preceding P1 branch.
+
+## Safe execution order
+
+1. P2-02 / P2-04: add read-only summarized counters and explicit unknown states to the existing PowerShell audit, with automated regression tests.
+2. P2-03: inspect real webhook delivery history through D1 read-only, protect privacy and avoid fabricated events.
+3. P2-01: prepare build/deploy provenance contract and a deterministic deployment checklist; execute deployment only with reviewed target and approval.
+4. P2-05 / P2-06 / P2-07: assess provider dashboards, evidence ledger, release/rollback gates.
+
+## Hard safety conditions
+
+- A successful CI suite is not an authenticated production E2E certificate.
+- Resend Free limit enforcement is currently **100/day, 3000/month**, per provider account, based on local ledger; external sends to same Resend account are not tracked by that ledger.
+- Do not expose `CONTROL_PLANE_ADMIN_TOKEN`, `RESEND_RELAY_TOKEN`, `CONTROL_PLANE_VAULT_KEY` or webhook secrets. Never use bootstrap token as administrator API token.
+- On any uncertainty in quota, relay idempotency, maintenance or webhook outcomes, fail closed and preserve real mail delivery.
