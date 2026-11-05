@@ -5,7 +5,7 @@ import { runInNewContext } from "node:vm";
 
 const html=readFileSync(new URL("../../public/index.html",import.meta.url),"utf8");
 const start=html.indexOf("function replyRecipients(message, mailboxAddress, mode){");
-const end=html.indexOf("function replyMessage(message,mode){",start);
+const end=html.indexOf("function replyMessage(message,mode",start);
 assert.ok(start>=0 && end>start,"recipient helper must exist");
 const getRecipients=runInNewContext("("+html.slice(start,end).trim()+")") as
   (m:Record<string,unknown>,self:string,mode:string)=>{to:string[];cc:string[]};

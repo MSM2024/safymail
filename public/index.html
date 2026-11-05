@@ -96,7 +96,7 @@ async function openMessage(m){state.selected=m;document.querySelector(".content"
  if(x.authentication_results){const details=document.createElement("details");details.className="security-details";const summary=document.createElement("summary");summary.textContent="Detalles de seguridad y autenticación";const auth=document.createElement("pre");auth.textContent=x.authentication_results;details.append(summary,auth);r.append(details);}
  r.append(body);
  if(x.html_body){const toggleHtml=document.createElement("button");toggleHtml.className="btn";toggleHtml.type="button";toggleHtml.textContent="Ver versión HTML aislada";toggleHtml.style.margin="0 20px 16px";const frame=document.createElement("iframe");frame.className="html-preview";frame.title="Contenido HTML del correo, aislado";frame.setAttribute("sandbox","");frame.setAttribute("referrerpolicy","no-referrer");frame.hidden=true;const policy="default-src 'none'; script-src 'none'; connect-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:; media-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'";frame.srcdoc='<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="'+policy+'"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font:14px/1.55 Arial,sans-serif;color:#202938;overflow-wrap:anywhere;margin:16px}img{max-width:100%;height:auto}table{max-width:100%}</style></head><body>'+x.html_body+'</body></html>';toggleHtml.onclick=()=>{frame.hidden=!frame.hidden;toggleHtml.textContent=frame.hidden?"Ver versión HTML aislada":"Ocultar versión HTML";};r.append(toggleHtml,frame);}
- $("read").onclick=()=>toggle(x,{is_read:!x.is_read});$("star").onclick=()=>toggle(x,{is_starred:!x.is_starred});$("important").onclick=()=>toggle(x,{is_important:!x.is_important});$("archive").onclick=()=>toggle(x,{folder:x.folder==="archive"?"inbox":"archive"});$("trash").onclick=()=>toggle(x,{folder:(x.folder==="trash"||x.folder==="spam")?"inbox":"trash"});$("reply").onclick=()=>replyMessage(x,"reply");$("reply-all").onclick=()=>replyMessage(x,"replyAll");$("forward").onclick=()=>replyMessage(x,"forward");if(d.attachments?.length){const a=document.createElement("div");a.className="attachment-list";const title=document.createElement("strong");title.textContent="Archivos adjuntos · "+d.attachments.length;a.append(title);d.attachments.forEach(z=>{const card=document.createElement("div");card.className="attachment-card";const ext=(String(z.filename||"FILE").split(".").pop()||"FILE").slice(0,4).toUpperCase();const type=document.createElement("span");type.className="attachment-type";type.textContent=ext;const info=document.createElement("div");info.className="attachment-info";const link=document.createElement("a");link.href="/api/attachments/"+encodeURIComponent(z.id);link.textContent=z.filename||"Archivo adjunto";link.title=z.filename||"Archivo adjunto";link.setAttribute("download",z.filename||"attachment");const meta=document.createElement("small");meta.textContent=fileSize(z.size_bytes||0)+" · Descargar";info.append(link,meta);card.append(type,info);a.append(card);});r.append(a);}}catch(e){error($("reader"),e.message);}}
+ $("read").onclick=()=>toggle(x,{is_read:!x.is_read});$("star").onclick=()=>toggle(x,{is_starred:!x.is_starred});$("important").onclick=()=>toggle(x,{is_important:!x.is_important});$("archive").onclick=()=>toggle(x,{folder:x.folder==="archive"?"inbox":"archive"});$("trash").onclick=()=>toggle(x,{folder:(x.folder==="trash"||x.folder==="spam")?"inbox":"trash"});$("reply").onclick=()=>replyMessage(x,"reply");$("reply-all").onclick=()=>replyMessage(x,"replyAll");$("forward").onclick=()=>replyMessage(x,"forward",d.attachments||[]);if(d.attachments?.length){const a=document.createElement("div");a.className="attachment-list";const title=document.createElement("strong");title.textContent="Archivos adjuntos · "+d.attachments.length;a.append(title);d.attachments.forEach(z=>{const card=document.createElement("div");card.className="attachment-card";const ext=(String(z.filename||"FILE").split(".").pop()||"FILE").slice(0,4).toUpperCase();const type=document.createElement("span");type.className="attachment-type";type.textContent=ext;const info=document.createElement("div");info.className="attachment-info";const link=document.createElement("a");link.href="/api/attachments/"+encodeURIComponent(z.id);link.textContent=z.filename||"Archivo adjunto";link.title=z.filename||"Archivo adjunto";link.setAttribute("download",z.filename||"attachment");const meta=document.createElement("small");meta.textContent=fileSize(z.size_bytes||0)+" · Descargar";info.append(link,meta);card.append(type,info);a.append(card);});r.append(a);}}catch(e){error($("reader"),e.message);}}
 function replyRecipients(message, mailboxAddress, mode){
  const own=String(mailboxAddress||"").trim().toLowerCase();
  const parse=value=>{
@@ -123,13 +123,29 @@ function replyRecipients(message, mailboxAddress, mode){
  const cc=unique(others.filter(addr=>addr!==own),to);
  return {to:to.slice(0,50),cc:cc.slice(0,50)};
 }
-function replyMessage(message,mode){
+function replyMessage(message,mode,originalAttachments=[]){
  openComposer(mode==="forward"?"Reenviar mensaje":mode==="replyAll"?"Responder a todos":"Responder mensaje");
  const subject=String(message.subject||"");
  if(mode==="forward"){
   $("draft-subject").value=/^fwd?:/i.test(subject)?subject:"Fwd: "+subject;
   $("draft-body").value="\n\n---------- Mensaje reenviado ----------\nDe: "+(message.from_address||"")+"\nAsunto: "+subject+"\n\n"+(message.text_body||"");
   state.replyHeaders=null;
+  if(originalAttachments.length){
+    const generation=draftGeneration;
+    forwardAttachmentLoading=true;
+    $("send-message").disabled=true;
+    $("draft-status").textContent="Preparando adjuntos originales para reenviar…";
+    void restoreForwardAttachments(originalAttachments,generation)
+      .catch(error=>{
+        if(generation!==draftGeneration)return;
+        forwardAttachmentError=error.message;
+        $("draft-status").textContent="Adjuntos originales: "+error.message+" Abre nuevamente el mensaje para reintentar.";
+      }).finally(()=>{
+        if(generation!==draftGeneration)return;
+        forwardAttachmentLoading=false;
+        $("send-message").disabled=false;
+      });
+  }
  }else{
   const recipients=replyRecipients(message,state.account.local_part+"@"+state.account.domain,mode);
   $("draft-to").value=recipients.to.join(", ");
@@ -142,6 +158,7 @@ function replyMessage(message,mode){
  }
 }
 let draftId=null,draftTimer=null,draftLoadSerial=0,draftGeneration=0,draftRevision=0,draftSavedRevision=0,draftWrite=Promise.resolve(),draftSent=false;
+let forwardAttachmentLoading=false,forwardAttachmentError=null;
 const splitRecipients=id=>$(id).value.split(/[;,\n]/).map(value=>value.trim()).filter(Boolean);
 const draftPayload=()=>({
  account_id:state.account.id,to:splitRecipients("draft-to"),cc:splitRecipients("draft-cc"),
@@ -166,7 +183,7 @@ async function refreshSendReadiness(){
 function openComposer(title="Nuevo mensaje"){
  state.replyHeaders=null;
  if(!state.account){$("list-status").textContent="Selecciona un buzón antes de redactar.";return;}
- clearTimeout(draftTimer);draftLoadSerial++;draftGeneration++;draftRevision=0;draftSavedRevision=0;draftId=null;draftSent=false;state.pendingSend=null;
+ clearTimeout(draftTimer);draftLoadSerial++;draftGeneration++;draftRevision=0;draftSavedRevision=0;draftId=null;draftSent=false;state.pendingSend=null;forwardAttachmentLoading=false;forwardAttachmentError=null;
  $("compose-form").reset();$("compose-modal").querySelector(".modal-head h2").textContent=title;
  $("draft-status").textContent="Autoguardado activado. Los adjuntos se incorporan al enviar.";
  $("file-summary").innerHTML="<span>No hay archivos adjuntos.</span><strong>0 archivos · 0 MB</strong>";
@@ -192,6 +209,35 @@ async function editDraft(message){
  draftId=draft.id;
  $("draft-status").textContent="Borrador recuperado. Los cambios se guardan automáticamente.";
 }
+async function restoreForwardAttachments(attachments,generation){
+ if(attachments.length>5)throw Error("Este mensaje supera el límite de 5 adjuntos por envío.");
+ let total=0;
+ for(const a of attachments){
+  if(!a||!a.id||typeof a.filename!=="string"||!Number.isFinite(Number(a.size_bytes)))throw Error("Adjunto original inválido.");
+  const size=Number(a.size_bytes);
+  if(size<=0||size>5*1024*1024)throw Error("Uno de los archivos supera el límite de 5 MB.");
+  total+=size;
+  if(total>10*1024*1024)throw Error("Los adjuntos superan el límite de 10 MB.");
+ }
+ const dt=new DataTransfer();
+ for(const attachment of attachments){
+  const response=await fetch("/api/attachments/"+encodeURIComponent(attachment.id),{
+   credentials:"same-origin",cache:"no-store"
+  });
+  if(!response.ok)throw Error("No fue posible descargar un adjunto autorizado ("+response.status+").");
+  const bytes=await response.arrayBuffer();
+  if(bytes.byteLength!==Number(attachment.size_bytes)||bytes.byteLength>5*1024*1024)
+    throw Error("El tamaño de un adjunto no coincide con el original.");
+  if(generation!==draftGeneration||!$("compose-modal").open)return;
+  const type=(response.headers.get("Content-Type")||attachment.content_type||"application/octet-stream").split(";")[0];
+  const file=new File([bytes],attachment.filename,{type});
+  dt.items.add(file);
+ }
+ if(generation!==draftGeneration||!$("compose-modal").open)return;
+ $("draft-files").files=dt.files;
+ $("draft-files").dispatchEvent(new Event("change",{bubbles:true}));
+ $("draft-status").textContent=dt.files.length+" archivo(s) original(es) incorporado(s) al reenvío.";
+}
 async function readOutboundAttachments(){
  const files=Array.from($("draft-files").files||[]);if(files.length>5)throw Error("Puedes adjuntar como máximo 5 archivos.");
  let total=0;const result=[];
@@ -204,6 +250,8 @@ async function readOutboundAttachments(){
 }
 async function sendMessage(){
  if(!state.account)return;
+ if(forwardAttachmentLoading){$("draft-status").textContent="Preparando adjuntos originales…";return;}
+ if(forwardAttachmentError){$("draft-status").textContent="Reenvío bloqueado: "+forwardAttachmentError;return;}
  const split=id=>$(id).value.split(/[;,]/).flatMap(x=>x.split(String.fromCharCode(10))).map(x=>x.trim()).filter(Boolean);
  let attachments;try{attachments=await readOutboundAttachments();}catch(e){$("draft-status").textContent=e.message;return;}
  const payload={account_id:state.account.id,to:split("draft-to"),cc:split("draft-cc"),bcc:split("draft-bcc"),subject:$("draft-subject").value,text_body:$("draft-body").value,attachments,...(state.replyHeaders||{})};
