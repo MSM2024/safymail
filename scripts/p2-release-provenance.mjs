@@ -84,7 +84,7 @@ async function main() {
     if (git(["status", "--porcelain", "--untracked-files=no"]) !== "") {
       throw Error("tracked working tree must be clean before preparing a release");
     }
-    const manifest = makeManifest(commit, source, shell, new Date().toISOString());
+    const manifest = makeManifest(commit, gitFileAtCommit(commit, "src/index.ts"), gitFileAtCommit(commit, "public/index.html"), new Date().toISOString());
     writeFileSync(file, JSON.stringify(manifest, null, 2) + "\n", { flag: "w" });
     console.log("P2 RELEASE PREPARED (local assets only): " + manifest.commit);
     console.log("Manifest: public/msm-release.json");
