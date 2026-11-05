@@ -27,3 +27,13 @@ test("approved release remote is independent of template origin",()=>{
  assert.equal(isApprovedRemote("https://github.com/alexeiderc/safymail.git"),false);
  assert.equal(assessDeployPreflight({...good(),remoteUrl:"https://github.com/alexeiderc/safymail.git"}).reason,"unexpected-release-remote");
 });
+
+test("Windows BOM and CRLF formatted Wrangler config is accepted with verified worker",()=>{
+ const crlf='\uFEFFname = "msm-mail-preview"\r\nmain = "src/index.ts"\r\n[assets]\r\ndirectory = "./public"\r\n';
+ assert.equal(assessDeployPreflight({...good(),config:crlf}).result,"READY-FOR-LOCAL-DRY-RUN");
+ assert.equal(assessDeployPreflight({...good(),config:'   name = "msm-mail-preview" # preview\r\n  [assets]\r\n'}).result,"READY-FOR-LOCAL-DRY-RUN");
+});
+test("BOM and whitespace do not relax wrong-target checks",()=>{
+ const config='\uFEFF name = "msm-mail-control-plane"\r\n[assets]\r\n';
+ assert.equal(assessDeployPreflight({...good(),config}).reason,"wrong-worker-target");
+});
