@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { receiveEmail } from "./email/inbound";
+import { parseDraftReplyHeaders } from "./email/draft-reply";
 import { arrayBufferToBase64, isAllowedAttachment, parseOutboundAttachments } from "./email/attachments";
 import { releaseMailStorage, reserveMailStorage } from "./email/storage";
 import { verifyResendWebhook } from "./email/webhooks";
@@ -1380,14 +1381,14 @@ async function authorizeDraft(c: any, id: string) {
   const user = c.get("user");
   if (user.isSuperadmin) {
     return c.env.DB.prepare(
-      `SELECT m.id,m.account_id,m.to_addresses,m.cc_addresses,m.bcc_addresses,m.subject,m.text_body
+      `SELECT m.id,m.account_id,m.to_addresses,m.cc_addresses,m.bcc_addresses,m.subject,m.text_body,m.in_reply_to,m.references_header
        FROM messages m JOIN email_accounts ea ON ea.id=m.account_id
        JOIN companies co ON co.id=ea.company_id
        WHERE m.id=? AND m.folder='drafts' AND ea.status='active' AND co.status='active'`
     ).bind(id).first();
   }
   return c.env.DB.prepare(
-    `SELECT m.id,m.account_id,m.to_addresses,m.cc_addresses,m.bcc_addresses,m.subject,m.text_body
+    `SELECT m.id,m.account_id,m.to_addresses,m.cc_addresses,m.bcc_addresses,m.subject,m.text_body,m.in_reply_to,m.references_header
      FROM messages m JOIN email_accounts ea ON ea.id=m.account_id
      JOIN companies co ON co.id=ea.company_id
      JOIN company_memberships cm ON cm.company_id=ea.company_id AND cm.user_id=?
@@ -1428,7 +1429,7 @@ app.post("/api/drafts", async (c) => {
   const user = c.get("user");
   const body = await c.req.json<{
     account_id?: string; to?: unknown; cc?: unknown; bcc?: unknown;
-    subject?: string; text_body?: string;
+    subject?: string; text_body?: string; in_reply_to?: unknown; references?: unknown;
   }>().catch(() => ({} as any));
   const accountId = typeof body.account_id === "string" ? body.account_id : "";
   const to = parseRecipients(body.to);
@@ -1436,7 +1437,8 @@ app.post("/api/drafts", async (c) => {
   const bcc = parseRecipients(body.bcc);
   const subject = typeof body.subject === "string" ? body.subject.slice(0, 998) : "";
   const textBody = typeof body.text_body === "string" ? body.text_body : "";
-  if (!accountId || !to || !cc || !bcc || textBody.length > 200000) {
+  const replyHeaders=parseDraftReplyHeaders(body);
+  if (!accountId || !to || !cc || !bcc || !replyHeaders || textBody.length > 200000) {
     return c.json({ error: "invalid_draft" }, 400);
   }
   const account = await getDraftAccount(c, accountId, user);
@@ -1446,10 +1448,10 @@ app.post("/api/drafts", async (c) => {
   await c.env.DB.prepare(
     `INSERT INTO messages
       (id, company_id, account_id, direction, folder, from_address, to_addresses,
-       cc_addresses, bcc_addresses, subject, text_body, is_read)
-     VALUES (?, ?, ?, 'outbound', 'drafts', ?, ?, ?, ?, ?, ?, 1)`
+       cc_addresses, bcc_addresses, subject, text_body, in_reply_to, references_header, is_read)
+     VALUES (?, ?, ?, 'outbound', 'drafts', ?, ?, ?, ?, ?, ?, ?, ?, 1)`
   ).bind(id, account.company_id, accountId, from, JSON.stringify(to), JSON.stringify(cc),
-    JSON.stringify(bcc), subject, textBody).run();
+    JSON.stringify(bcc), subject, textBody, replyHeaders.inReplyTo, replyHeaders.references).run();
   return c.json({ draft: { id, accountId, from, to, cc, bcc, subject } }, 201);
 });
 
@@ -1457,16 +1459,17 @@ app.patch("/api/drafts/:id", async (c) => {
   const user = c.get("user");
   const id = c.req.param("id");
   const body = await c.req.json<{
-    to?: unknown; cc?: unknown; bcc?: unknown; subject?: string; text_body?: string;
+    to?: unknown; cc?: unknown; bcc?: unknown; subject?: string; text_body?: string; in_reply_to?: unknown; references?: unknown;
   }>().catch(() => ({} as any));
   const to = parseRecipients(body.to);
   const cc = parseRecipients(body.cc);
   const bcc = parseRecipients(body.bcc);
   const subject = typeof body.subject === "string" ? body.subject.slice(0, 998) : undefined;
   const textBody = typeof body.text_body === "string" ? body.text_body : undefined;
-  if ((body.to !== undefined && !to) || (body.cc !== undefined && !cc) ||
+  const replyHeaders=parseDraftReplyHeaders(body);
+  if (!replyHeaders || (body.to !== undefined && !to) || (body.cc !== undefined && !cc) ||
       (body.bcc !== undefined && !bcc) || (textBody !== undefined && textBody.length > 200000) ||
-      (subject === undefined && textBody === undefined && body.to === undefined && body.cc === undefined && body.bcc === undefined)) {
+      (subject === undefined && textBody === undefined && body.to === undefined && body.cc === undefined && body.bcc === undefined && body.in_reply_to === undefined && body.references === undefined)) {
     return c.json({ error: "invalid_draft_update" }, 400);
   }
   const access = user.isSuperadmin
@@ -1492,6 +1495,8 @@ app.patch("/api/drafts/:id", async (c) => {
   if (body.bcc !== undefined) { sets.push("bcc_addresses = ?"); values.push(JSON.stringify(bcc)); }
   if (subject !== undefined) { sets.push("subject = ?"); values.push(subject); }
   if (textBody !== undefined) { sets.push("text_body = ?"); values.push(textBody); }
+  if (body.in_reply_to !== undefined) { sets.push("in_reply_to = ?"); values.push(replyHeaders.inReplyTo as string); }
+  if (body.references !== undefined) { sets.push("references_header = ?"); values.push(replyHeaders.references as string); }
   values.push(id);
   const guard = user.isSuperadmin ? "" : ` AND EXISTS (
     SELECT 1 FROM email_accounts ea
