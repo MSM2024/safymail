@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { extractAccountId, classifyDeployments, classifyWranglerOutput, readWranglerDeployment, readCloudflareDeployment } from "./p2-worker-active-version-audit.mjs";
@@ -56,4 +57,11 @@ test("Wrangler fallback only reads deployment listing with safe fixed arguments"
   assert.deepEqual(seen.args,["--no-install","wrangler","deployments","list","--config","wrangler.toml"]);
   assert.equal(seen.options.windowsHide,true);
   assert.throws(()=>readWranglerDeployment(expected,()=>({status:1,stdout:""})),/unavailable/);
+});
+
+test("Wrangler fallback must not pre-parse account ID or Worker name",()=>{
+  const source=readFileSync(new URL("./p2-worker-active-version-audit.mjs",import.meta.url),"utf8");
+  assert.match(source,/const result=token\s*\? classifyDeployments/);
+  assert.match(source,/: readWranglerDeployment\(expected\)/);
+  assert.ok(!source.includes("const account=extractAccountId(config)"));
 });
