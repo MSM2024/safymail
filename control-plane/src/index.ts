@@ -1,3 +1,4 @@
+import { isValidResendWebhookSecret } from "./webhook-secret-validation";
 import { Hono } from "hono";
 import { sealCredentials, openCredentials, processProvisioningJob, deriveMaintenanceToken, deriveResendRelayToken, openProvisioningSecret, sealSecret } from "./provisioning-jobs";
 import { processMaintenanceBatch } from "./maintenance-jobs";
@@ -422,19 +423,6 @@ app.get("/api/installations/:id/runtime-config", async c => {
     resendRelay: { authorization: "Bearer " + resendRelayToken }
   });
 });
-
-// Signing keys use standard Base64 (including "+" and "/"), not Base64URL.
-// Reject malformed padding or short decoded keys before encrypting the secret.
-function isValidResendWebhookSecret(secret: string): boolean {
-  if (!secret.startsWith("whsec_")) return false;
-  const encoded = secret.slice(6);
-  if (encoded.length % 4 !== 0 || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(encoded)) return false;
-  try {
-    return atob(encoded).length >= 16;
-  } catch {
-    return false;
-  }
-}
 
 // Recover a pre-existing Resend webhook without deleting, recreating, or rotating it.
 // Admin API authentication is enforced by the /api/* middleware above.
