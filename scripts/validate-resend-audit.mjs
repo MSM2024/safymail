@@ -34,4 +34,6 @@ assert.ok(source.includes("P2 SCHEDULER LAG AND COMPLETION EVIDENCE"),"P2-04 mai
 assert.ok(source.includes("distinct_slots_24h") && source.includes("newest_dispatch_age_minutes"),"Scheduler must report distinct slots and last-dispatch age");
 assert.ok(source.includes("Queue pending, retries and DLQ depth: UNKNOWN"),"Do not infer Queue metrics from D1 dispatch claims");
 assert.ok(source.includes("not proof of queue delivery or task completion"),"No false maintenance completion proof");
+assert.ok(source.includes("P2 LATEST SLOT COMPLETION") && source.includes("p2-maintenance-completion.mjs"),"P2-04 must compare latest slots");
+assert.ok(source.includes("P2 latest completion: ALERT or UNKNOWN"),"P2-04 must report failure without false green status");
 console.log("MSM Resend audit PowerShell 5.1 encoding and read-only guard PASS");
