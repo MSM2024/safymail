@@ -16,7 +16,7 @@ test("incomplete claimed slot and stale completion produce explicit alert",()=>{
  const result=evaluateMaintenance({dispatchedSlot:latest,completedSlot:earlier,lockActive:0,now});
  assert.equal(result.status,"alert");
  assert.equal(result.backlogSlots,1);
- assert.equal(evaluateMaintenance({dispatchedSlot:earlier,completedSlot:earlier,lockActive:0,now}).status,"alert");
+ assert.equal(evaluateMaintenance({dispatchedSlot:"2026-11-05T18:30:00.000Z",completedSlot:"2026-11-05T18:30:00.000Z",lockActive:0,now}).status,"alert");
 });
 test("missing or implausible timestamps and invalid lock never PASS",()=>{
  const base={dispatchedSlot:latest,completedSlot:latest,lockActive:0,now};
