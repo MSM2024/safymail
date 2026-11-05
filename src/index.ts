@@ -1158,7 +1158,7 @@ async function getDraftAccount(c: any, accountId: string, user: { id: string; is
     SELECT 1 FROM company_memberships cm
     JOIN account_permissions ap ON ap.account_id = ea.id AND ap.user_id = cm.user_id
     WHERE cm.user_id = ? AND cm.company_id = ea.company_id
-      AND ap.permission IN ('read_write','send_only')
+      AND ap.permission = 'read_write'
   ) AND (? IS NULL OR ea.company_id = ?)`).bind(accountId, user.id, c.get("hostCompanyId"), c.get("hostCompanyId")).first() as Promise<DraftAccount | null>;
 }
 
@@ -1351,7 +1351,7 @@ async function authorizeDraft(c: any, id: string) {
      JOIN company_memberships cm ON cm.company_id=ea.company_id AND cm.user_id=?
      JOIN account_permissions ap ON ap.account_id=ea.id AND ap.user_id=?
      WHERE m.id=? AND m.folder='drafts' AND ea.status='active' AND co.status='active'
-       AND ap.permission IN ('read_write','send_only')
+       AND ap.permission = 'read_write'
        AND (? IS NULL OR ea.company_id=?)`
   ).bind(user.id,user.id,id,c.get("hostCompanyId"),c.get("hostCompanyId")).first();
 }
@@ -1427,7 +1427,7 @@ app.patch("/api/drafts/:id", async (c) => {
          JOIN company_memberships cm ON cm.company_id = ea.company_id AND cm.user_id = ?
          JOIN account_permissions ap ON ap.account_id = ea.id AND ap.user_id = ?
          WHERE m.id = ? AND m.folder = 'drafts' AND ea.status = 'active'
-           AND co.status = 'active' AND ap.permission IN ('read_write','send_only')
+           AND co.status = 'active' AND ap.permission = 'read_write'
            AND (? IS NULL OR ea.company_id = ?)`
       ).bind(user.id, user.id, id, c.get("hostCompanyId"), c.get("hostCompanyId")).first();
   if (!access) return c.json({ error: "draft_not_found" }, 404);
