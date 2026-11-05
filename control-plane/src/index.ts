@@ -1,3 +1,4 @@
+import { resolveMailWebhookRoute } from "./webhook-forwarding";
 import { isValidResendWebhookSecret } from "./webhook-secret-validation";
 import { Hono } from "hono";
 import { sealCredentials, openCredentials, processProvisioningJob, deriveMaintenanceToken, deriveResendRelayToken, openProvisioningSecret, sealSecret } from "./provisioning-jobs";
@@ -10,6 +11,9 @@ interface Env {
   CONTROL_PLANE_VAULT_KEY: string;
   CONTROL_PLANE_ENV?: string;
   CONTROL_PLANE_PUBLIC_URL?: string;
+  MAIL_DELIVERY_SERVICE?: Fetcher;
+  MAIL_DELIVERY_DOMAIN?: string;
+  MAIL_DELIVERY_HOST?: string;
   PROVISIONING_QUEUE: Queue<{ installationId: string; jobId: string } | { type: "maintenance"; installationIds: string[]; slot: string }>;
 }
 type Vars = { requestId: string };
@@ -609,7 +613,11 @@ app.post("/webhooks/resend/:providerAccountId", async c => {
     }
     let response: Response | null = null;
     try {
-      response = await fetch("https://mail." + delivery.domain + "/api/webhooks/resend", {
+      const route = resolveMailWebhookRoute(delivery.domain, c.env.MAIL_DELIVERY_DOMAIN, c.env.MAIL_DELIVERY_HOST);
+      const sender = route.useBinding && c.env.MAIL_DELIVERY_SERVICE
+        ? c.env.MAIL_DELIVERY_SERVICE.fetch.bind(c.env.MAIL_DELIVERY_SERVICE)
+        : fetch;
+      response = await sender(route.url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -618,7 +626,7 @@ app.post("/webhooks/resend/:providerAccountId", async c => {
           "svix-signature": c.req.header("svix-signature") || ""
         },
         body: rawBody,
-        redirect: "error"
+        redirect: "manual"
       });
     } catch {
       response = null;
