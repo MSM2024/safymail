@@ -423,6 +423,19 @@ app.get("/api/installations/:id/runtime-config", async c => {
   });
 });
 
+// Signing keys use standard Base64 (including "+" and "/"), not Base64URL.
+// Reject malformed padding or short decoded keys before encrypting the secret.
+function isValidResendWebhookSecret(secret: string): boolean {
+  if (!secret.startsWith("whsec_")) return false;
+  const encoded = secret.slice(6);
+  if (encoded.length % 4 !== 0 || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(encoded)) return false;
+  try {
+    return atob(encoded).length >= 16;
+  } catch {
+    return false;
+  }
+}
+
 // Recover a pre-existing Resend webhook without deleting, recreating, or rotating it.
 // Admin API authentication is enforced by the /api/* middleware above.
 app.post("/api/installations/:id/resend-webhook-secret", async c => {
@@ -434,7 +447,7 @@ app.post("/api/installations/:id/resend-webhook-secret", async c => {
   try { body = JSON.parse(raw); } catch { return fail(c, 400, "invalid_json"); }
   const secret = (body && typeof body === "object" && "signing_secret" in body)
     ? (body as { signing_secret?: unknown }).signing_secret : undefined;
-  if (typeof secret !== "string" || !/^whsec_[A-Za-z0-9_=-]{16,512}$/.test(secret)) {
+  if (typeof secret !== "string" || !/^whsec_[A-Za-z0-9+/=]{16,512}$/.test(secret) || !isValidResendWebhookSecret(secret)) {
     return fail(c, 400, "invalid_webhook_signing_secret");
   }
   const installation = await c.env.CONTROL_DB.prepare(
