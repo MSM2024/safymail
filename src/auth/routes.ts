@@ -1,3 +1,4 @@
+import { recordFailedLogin } from "./login-throttle";
 import { mfaAuthenticatedUser } from "./mfa-role";
 import { consumeMfaRecoveryCode } from "./recovery";
 import { Hono } from "hono";
@@ -78,11 +79,7 @@ auth.post("/login", async c => {
   const valid=user?.password_hash&&user.password_salt?await verifyPassword(password,user.password_salt,user.password_hash):
     await verifyPassword(password,"AAAAAAAAAAAAAAAAAAAAAA","AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
   if(!valid||!user){
-    const within=Boolean(attempt&&now.getTime()-Date.parse(attempt.window_started_at)<900000), count=within?(attempt?.failed_count??0)+1:1;
-    const locked=count>=8?new Date(now.getTime()+900000).toISOString():null;
-    await c.env.DB.prepare(`INSERT INTO auth_login_attempts(ip_hash,email,failed_count,window_started_at,locked_until) VALUES(?,?,?,?,?)
-      ON CONFLICT(ip_hash,email) DO UPDATE SET failed_count=excluded.failed_count,window_started_at=excluded.window_started_at,locked_until=excluded.locked_until`)
-      .bind(ipHash,email,count,within?attempt!.window_started_at:now.toISOString(),locked).run();
+    await recordFailedLogin(c.env.DB,ipHash,email,now);
     return c.json({error:"invalid_credentials",message:"Correo o contraseña incorrectos."},401);
   }
   // A normal mailbox user may authenticate only through a hostname
