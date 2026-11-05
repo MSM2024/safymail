@@ -1,3 +1,4 @@
+import { evaluateActivationReadiness } from "./activation-readiness";
 import { resolveMailWebhookRoute } from "./webhook-forwarding";
 import { isValidResendWebhookSecret } from "./webhook-secret-validation";
 import { Hono } from "hono";
@@ -235,29 +236,20 @@ app.get("/api/installations/:id/readiness", async c => {
   const checkpoints = await c.env.CONTROL_DB.prepare(
     "SELECT step FROM control_checkpoints WHERE installation_id=? AND status='completed'"
   ).bind(installationId).all<{step:string}>();
-  const required = ["cloudflare_verified","d1_ready","kv_ready","resend_domain_ready","resend_webhook_ready"];
-  const done = new Set((checkpoints.results || []).map(row=>row.step));
-  const missingCheckpoints = required.filter(step=>!done.has(step));
   const secret = await c.env.CONTROL_DB.prepare(
     "SELECT 1 AS configured FROM control_secrets WHERE installation_id=? AND secret_name='RESEND_WEBHOOK_SECRET'"
   ).bind(installationId).first();
   const delivery = await c.env.CONTROL_DB.prepare(
     "SELECT COUNT(*) AS total FROM control_webhook_deliveries WHERE installation_id=? AND status='delivered'"
   ).bind(installationId).first<{total:number}>();
-  const ready = missingCheckpoints.length===0 && installation.current_step==="resources_ready" &&
-    installation.provider_status==="active" && Boolean(secret) && Number(delivery?.total || 0)>0 &&
-    installation.status==="configuring";
-  return c.json({
-    installationId, status:installation.status, readyForActivation:ready,
-    checks:{
-      provisioned:installation.current_step==="resources_ready",
-      providerActive:installation.provider_status==="active",
-      checkpointCount:required.length-missingCheckpoints.length,
-      missingCheckpoints,
-      webhookSecretConfigured:Boolean(secret),
-      verifiedWebhookDeliveries:Number(delivery?.total || 0)
-    }
+  const readiness = evaluateActivationReadiness({
+    status:installation.status, currentStep:installation.current_step,
+    providerStatus:installation.provider_status,
+    completedSteps:(checkpoints.results || []).map(row=>row.step),
+    webhookSecretConfigured:Boolean(secret),
+    forwardedWebhookCount:Number(delivery?.total || 0)
   });
+  return c.json({installationId,status:installation.status,...readiness});
 });
 
 // Explicit administrator action; transactional CAS prevents accidental status promotion.
