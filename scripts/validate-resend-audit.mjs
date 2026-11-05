@@ -9,4 +9,11 @@ assert.ok(source.includes("daily_used") && source.includes("monthly_used"),"Quot
 assert.ok(source.includes("reserved','sent','uncertain"),"Quota audit must count pending/uncertain reservations");
 assert.ok(source.includes("external Resend sends are NOT included"),"Quota audit must disclose external-usage blind spot");
 assert.ok(!/wrangler\\s+d1\\s+execute[^\\r\\n]*\\s--command\\s+[^\\r\\n]*(?:DELETE|UPDATE|INSERT|DROP|ALTER)\\b/i.test(source),"Audit SQL must be read-only");
+// Regression: DMARC TXT starts with "v=DMARC1;" (semicolon, not whitespace).
+const dmarcPattern = source.match(/\$dmarc=@\(\$txt\|Where-Object \{ \$_ -match '([^']+)' \}\)/)?.[1];
+assert.ok(dmarcPattern,"DMARC matcher must be present");
+const matchVersion = new RegExp(dmarcPattern,"i");
+assert.ok(matchVersion.test("v=DMARC1; p=none; adkim=r"),"DMARC semicolon record must match");
+assert.ok(matchVersion.test("v=DMARC1"),"Bare DMARC version must match");
+assert.ok(!matchVersion.test("v=DMARC12; p=none"),"Invalid DMARC version must not match");
 console.log("MSM Resend audit PowerShell 5.1 encoding and read-only guard PASS");
