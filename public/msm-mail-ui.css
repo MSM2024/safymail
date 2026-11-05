@@ -115,3 +115,81 @@ html,body{max-width:100%;overflow-x:hidden}
 @media(prefers-reduced-motion:reduce){
   .auth-screen,.auth-card,.btn,.account,.folder,.compose,.message{animation:none!important;transition:none!important}
 }
+
+/* P3 auth experience: restrained premium identity shared by login/bootstrap and MFA. */
+.auth-screen{
+  background:
+    radial-gradient(circle at 18% 14%,rgba(57,209,241,.15),transparent 34%),
+    radial-gradient(circle at 82% 82%,rgba(224,179,71,.10),transparent 32%),
+    linear-gradient(155deg,#07101f 0%,#0f1e36 57%,#1c2a3d 100%);
+  color:#172033;
+}
+.auth-screen::before{
+  content:"MSM MAIL";position:fixed;top:max(20px,env(safe-area-inset-top));left:clamp(18px,5vw,64px);
+  color:#e4edf7;font:700 12px/1.4 Inter,ui-sans-serif,system-ui,sans-serif;
+  letter-spacing:.19em;pointer-events:none;
+}
+.auth-card{
+  width:min(448px,100%);
+  padding:clamp(24px,3vw,36px);
+  border:1px solid rgba(255,255,255,.72);
+  border-radius:22px;
+  background:#fff;
+  box-shadow:0 32px 100px rgba(0,7,22,.40),0 1px 1px rgba(9,20,40,.12);
+}
+.auth-card .brand{gap:12px;align-items:center}
+.auth-card .brand .mark{
+  flex:none;width:44px;height:44px;border-radius:14px;
+  background:linear-gradient(145deg,#173b66,#0f1e36);color:#fff;
+  font-size:21px;box-shadow:0 10px 22px rgba(15,30,54,.2);
+}
+.auth-card .brand strong{font-size:16px;letter-spacing:-.025em}
+.auth-card .brand small{color:#64758b;font-size:11px}
+.auth-card h1{font-size:clamp(24px,3vw,30px);line-height:1.16;letter-spacing:-.04em;margin-bottom:9px}
+.auth-card p{font-size:13px;line-height:1.65;max-width:42ch;margin-bottom:23px}
+.auth-card form{gap:15px}
+.auth-card label{font-size:12px;font-weight:650;color:#344358;gap:7px}
+.auth-card input{
+  min-height:48px;border-radius:12px;border:1px solid #cad3df;
+  background:#f9fbfe;padding:12px 14px;color:#12223b;
+  transition:border-color .15s,box-shadow .15s;
+}
+.auth-card input:hover{border-color:#8ea4bd}
+.auth-card input:focus-visible{
+  border-color:#1886a8;outline:2px solid #8edbec;outline-offset:1px;
+  box-shadow:0 0 0 4px rgba(57,209,241,.12);
+}
+.auth-card .btn.primary{
+  min-height:48px;border-radius:12px;
+  background:#123353;border-color:#123353;color:#fff;font-size:14px;font-weight:750;
+  transition:background .15s,transform .15s;
+}
+.auth-card .btn.primary:hover:not(:disabled){background:#174b70}
+.auth-card .btn.primary:active:not(:disabled){transform:translateY(1px)}
+.auth-card .btn.primary:disabled{opacity:.58}
+.auth-card .auth-error{line-height:1.5;overflow-wrap:anywhere}
+.auth-card .auth-error:empty{min-height:0}
+.auth-card .auth-note{
+  margin-top:21px;border-top:1px solid #e7edf4;padding-top:15px;
+  color:#65758b;font-size:11px;line-height:1.6;
+}
+.auth-card[data-auth-surface="mfa"] #mfa-code{
+  font-variant-numeric:tabular-nums;letter-spacing:.12em;font-size:18px;
+}
+@media(max-width:650px){
+  .auth-screen{padding-top:max(58px,env(safe-area-inset-top))}
+  .auth-screen::before{top:max(17px,env(safe-area-inset-top));left:20px;font-size:11px}
+  .auth-card{width:min(430px,100%);border-radius:19px;padding:clamp(20px,5vw,28px)}
+  .auth-card h1{font-size:25px}
+}
+@media(max-width:650px) and (max-height:560px){
+  .auth-screen{padding-top:48px;padding-bottom:12px;align-items:flex-start}
+  .auth-card{margin:auto}
+  .auth-card .brand{padding-bottom:10px!important}
+  .auth-card p{margin-bottom:12px}
+  .auth-card form{gap:9px}
+  .auth-card .auth-note{margin-top:11px;padding-top:10px}
+}
+@media(prefers-reduced-motion:reduce){
+  .auth-card input,.auth-card .btn.primary{transition:none;transform:none}
+}
