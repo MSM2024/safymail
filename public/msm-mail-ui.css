@@ -193,3 +193,107 @@ html,body{max-width:100%;overflow-x:hidden}
 @media(prefers-reduced-motion:reduce){
   .auth-card input,.auth-card .btn.primary{transition:none;transform:none}
 }
+
+/* P3 round 3: premium mail workspace, reader and composer. Existing DOM and routes preserved. */
+:root{
+  --msm-workspace-ink:#17263d;
+  --msm-workspace-navy:#10243e;
+  --msm-workspace-cyan:#168cad;
+  --msm-workspace-border:#dfe7f1;
+  --msm-workspace-muted:#5b6f88;
+}
+.app{background:#f0f4f9}
+.sidebar{background:linear-gradient(170deg,#0c192b 0%,#10243e 68%,#172d48 100%)}
+.sidebar .brand .mark{background:linear-gradient(145deg,#39d1f1,#2d75a4);color:#091b2c;box-shadow:0 8px 22px #07162666}
+.sidebar .brand strong{color:#f7fbff}
+.sidebar .section-label{color:#9eb4d0}
+.sidebar .account,.sidebar .folder{border:1px solid transparent}
+.sidebar .account:hover,.sidebar .folder:hover{background:#203957;border-color:#38516e}
+.sidebar .account.active,.sidebar .folder.active{background:#203f61;border-color:#3d5e7f;color:#fff}
+.sidebar .folder.active{box-shadow:inset 3px 0 #39d1f1}
+.sidebar .sidefoot{border-top:1px solid #30425b}
+.topbar{border-bottom:1px solid #dfe6f0;background:rgba(255,255,255,.95);color:var(--msm-workspace-ink)}
+.topbar .crumb{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.topbar .avatar{background:#e2f5fa;color:#125671;border:1px solid #c8e6ee}
+.content{min-width:0;min-height:0;gap:14px}
+.content>.panel{min-height:0;min-width:0;border:1px solid var(--msm-workspace-border);border-radius:18px;box-shadow:0 12px 32px rgba(16,36,62,.055)}
+.list-head{padding:21px 20px 17px;background:linear-gradient(180deg,#fff,#fbfdff)}
+.list-head h1{font-size:22px;line-height:1.2;color:var(--msm-workspace-ink)}
+.list-head .sub{color:var(--msm-workspace-muted);overflow-wrap:anywhere}
+.list-head .compose{background:linear-gradient(120deg,#13375a,#19617e);color:#fff;min-height:46px;font-size:13px;font-weight:750;box-shadow:0 8px 20px #16456822}
+.list-head .compose:hover{background:linear-gradient(120deg,#1b4a70,#167fa0)}
+.search{width:100%;min-height:44px;background:#f5f8fc;border:1px solid #d6e0eb;color:#21354e}
+.search::placeholder{color:#76879d;opacity:1}
+.quick-filters{gap:7px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin;padding-bottom:3px}
+.quick-filter{flex:0 0 auto;min-height:34px;background:#edf2f7;color:#455e7c;border-color:transparent}
+.quick-filter.active{background:#d8f2f8;color:#0e5973;border:1px solid #a9dfeb}
+.quick-filter:focus-visible,.folder:focus-visible,.account:focus-visible,.btn:focus-visible{outline:3px solid #39d1f1;outline-offset:2px}
+.messages{background:#fff}
+.message{position:relative;min-width:0;border-bottom:1px solid #edf1f5;padding:15px 16px;transition:background .15s}
+.message:hover{background:#f4f9fc}
+.message.unread{background:#f3f9fe}
+.message.active{background:#e9f5fb;box-shadow:inset 3px 0 #168cad}
+.message.unread .sender,.message.unread .subject{color:#132b45}
+.message .sender{color:#344e6d;font-size:12px}
+.message .subject{color:#1b2c44;font-size:13px;line-height:1.45}
+.message .preview{color:#60748f;font-size:11px}
+.message .date{color:#667a92;font-variant-numeric:tabular-nums}
+.message .star,.message .important{min-width:20px;min-height:28px}
+#load-more{min-height:40px}
+#list-status{border-top:1px solid #eef2f6;background:#fbfdff}
+.reader{background:#fff}
+.reader .empty{display:grid;justify-items:center;align-content:center;min-height:220px;padding:32px 24px;color:#5e738d}
+.reader .empty strong{font-size:16px;color:#243b57}
+.reader .empty p{max-width:35ch;line-height:1.6}
+.reader .empty-icon{display:grid;place-items:center;width:65px;height:65px;border-radius:20px;background:#eaf5fb;color:#17607c;font-size:30px}
+.reader-head{background:linear-gradient(180deg,#fff,#fcfdff);border-bottom:1px solid #e8edf4}
+.reader-head h2{color:#172a43;font-size:clamp(19px,2vw,24px);overflow-wrap:anywhere}
+.reader-meta{color:#5b6e85}
+.reader-meta .from-line{color:#243953}
+.reader-body{color:#26384d;font-size:14px;line-height:1.75;overflow-wrap:anywhere}
+.reader .actions{gap:8px;flex-wrap:wrap}
+.reader .actions .btn{min-height:38px}
+.reader .btn:hover,.modal .btn:not(.primary):hover{background:#eef6fa;border-color:#bddce8}
+.reader .security-details{background:#f7fafc}
+.reader .attachment-list{background:#f5f9fc}
+.html-preview{max-width:calc(100% - 36px)}
+#compose-modal{border:1px solid #dbe5f0;box-shadow:0 30px 90px rgba(4,22,44,.32)}
+#compose-modal .modal-head{background:#fbfdff;border-bottom:1px solid #e2eaf3}
+#compose-modal .modal-head h2{font-size:18px;font-weight:750;color:#19314d}
+#compose-modal .compose-form{background:#fff}
+#compose-modal .compose-form label{color:#415873;font-weight:650}
+#compose-modal .compose-form input,#compose-modal .compose-form textarea{
+  background:#fafdff;border:1px solid #ccd9e6;border-radius:11px;
+  color:#172a43;min-height:44px
+}
+#compose-modal .compose-form textarea{line-height:1.6;min-height:135px}
+#compose-modal .compose-footer{background:#fff;border-top-color:#e3eaf3}
+#compose-modal .compose-footer small{color:#61748c;overflow-wrap:anywhere}
+#compose-modal .btn.primary{background:#124f70;border-color:#124f70;color:#fff;min-height:42px}
+#compose-modal .btn.primary:hover:not(:disabled){background:#176888}
+#compose-modal .msm-attachment-drop{background:#f4f9fc;border-color:#9ebdd3}
+#compose-modal .msm-attachment-chip{border-color:#cbddea}
+@media(max-width:1050px){
+  .content{gap:11px}
+  .topbar .user-tools{min-width:0}
+}
+@media(max-width:650px){
+  .content{gap:0;padding:9px}
+  .content>.panel{border-radius:14px}
+  .list-head{padding:17px 14px 13px}
+  .list-head h1{font-size:21px}
+  .message{padding:13px 11px;min-height:70px}
+  .message .subject{font-size:13px}
+  .reader-head,.reader-body{padding:18px 16px}
+  .reader .empty{min-height:160px}
+  .reader .actions .btn{min-height:44px}
+  #compose-modal .compose-form input,#compose-modal .compose-form textarea{font-size:16px}
+  #compose-modal .compose-footer>div{min-width:0}
+}
+@media(max-width:650px) and (max-height:560px){
+  .list-head{padding-block:10px}
+  .list-head .compose{margin-top:9px}
+  .quick-filters{margin-top:7px}
+  #compose-modal .compose-form{gap:8px}
+}
+@media(prefers-reduced-motion:reduce){.message{transition:none}}
