@@ -56,6 +56,15 @@
 - Conservative observed use = maximum of dashboard count and D1 reservation count in each period. Warning levels: watch 50%, warning 80%, critical 95%, exhausted 100% of 100/day or 3000/month. Unknown provider usage never reports account-wide remaining capacity.
 - Current D1 figures and provider dashboard observations can change; do not treat past output as current quota, guaranteed sending capacity, or real-time platform enforcement. No automated emails, billing changes, provider API credentials or production writes are involved.
 
+## P2-03 webhook lineage and dedup — operator evidence
+
+**Status: read-only lineage checks implemented; live database results pending.** Run `powershell -NoProfile -File scripts/msm-resend-readonly-audit.ps1` after syncing `main`; do not send synthetic email to generate events.
+
+- `control_webhook_deliveries` joined to `control_webhook_events` on both provider account and event key. Report only aggregated orphan delivery rows, unexpected statuses, retried pending rows, pending rows whose last attempt is older than one hour, forwarded rows without delivery timestamp, and distinct forwarded provider events.
+- The duplicate audit groups stored event keys by provider account and event key and counts duplicate groups, without exposing either key or message content. A zero count **does not measure repeated HTTP webhook submissions** which the existing `SELECT` plus `INSERT OR IGNORE` path may suppress before persistence.
+- Current forwarding code accepts already seen events and retries pending deliveries; its data model records the final forwarding state, not every upstream HTTP retry. A `delivered` delivery means **forwarded to the target Worker** and must not be presented as provider-confirmed delivery to a mailbox.
+- The first real run determines whether event-to-delivery lineage is clean. Database read failures or missing fields are `UNKNOWN`, not a passing inspection. No secrets, event IDs, raw webhook JSON or recipients are printed.
+
 ## Hard safety conditions
 
 - A successful CI suite is not an authenticated production E2E certificate.
