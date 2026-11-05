@@ -1382,8 +1382,20 @@ app.delete("/api/drafts/:id", async (c) => {
   const id=c.req.param("id");
   const draft=await authorizeDraft(c,id);
   if (!draft) return c.json({error:"draft_not_found"},404);
-  const result=await c.env.DB.prepare("DELETE FROM messages WHERE id=? AND folder='drafts'").bind(id).run();
-  return c.json({id,deleted:result.meta.changes===1});
+  const user = c.get("user");
+  const guard = user.isSuperadmin ? "" : ` AND EXISTS (
+    SELECT 1 FROM email_accounts ea
+    JOIN companies co ON co.id=ea.company_id AND co.status='active'
+    JOIN company_memberships cm ON cm.company_id=ea.company_id AND cm.user_id=?
+    JOIN account_permissions ap ON ap.account_id=ea.id AND ap.user_id=?
+      AND ap.permission='read_write'
+    WHERE ea.id=messages.account_id AND ea.status='active'
+      AND ea.company_id=?
+  )`;
+  const args = user.isSuperadmin ? [id] : [id,user.id,user.id,c.get("hostCompanyId")];
+  const result=await c.env.DB.prepare("DELETE FROM messages WHERE id=? AND folder='drafts'"+guard).bind(...args).run();
+  if((result.meta.changes??0)!==1)return c.json({error:"draft_not_found"},404);
+  return c.json({id,deleted:true});
 });
 
 app.post("/api/drafts", async (c) => {
@@ -1455,7 +1467,18 @@ app.patch("/api/drafts/:id", async (c) => {
   if (subject !== undefined) { sets.push("subject = ?"); values.push(subject); }
   if (textBody !== undefined) { sets.push("text_body = ?"); values.push(textBody); }
   values.push(id);
-  await c.env.DB.prepare(`UPDATE messages SET ${sets.join(", ")} WHERE id = ?`).bind(...values).run();
+  const guard = user.isSuperadmin ? "" : ` AND EXISTS (
+    SELECT 1 FROM email_accounts ea
+    JOIN companies co ON co.id=ea.company_id AND co.status='active'
+    JOIN company_memberships cm ON cm.company_id=ea.company_id AND cm.user_id=?
+    JOIN account_permissions ap ON ap.account_id=ea.id AND ap.user_id=?
+      AND ap.permission='read_write'
+    WHERE ea.id=messages.account_id AND ea.status='active'
+      AND ea.company_id=?
+  )`;
+  const args = user.isSuperadmin ? values : [...values,user.id,user.id,c.get("hostCompanyId")];
+  const result=await c.env.DB.prepare(`UPDATE messages SET ${sets.join(", ")} WHERE id = ? AND folder='drafts'`+guard).bind(...args).run();
+  if((result.meta.changes??0)!==1)return c.json({error:"draft_not_found"},404);
   return c.json({ id, updated: true });
 });
 
