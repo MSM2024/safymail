@@ -59,7 +59,7 @@ export async function openProvisioningSecret(master: string, ciphertext: string,
   );
   return new TextDecoder().decode(plaintext);
 }
-async function sealSecret(master: string, value: string, context: string) {
+export async function sealSecret(master: string, value: string, context: string) {
   const nonce = crypto.getRandomValues(new Uint8Array(12));
   const ciphertext = await crypto.subtle.encrypt(
     { name: "AES-GCM", iv: nonce, additionalData: encoder.encode(context) },
