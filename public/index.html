@@ -141,7 +141,7 @@ function replyMessage(message,mode){
   state.replyHeaders={...(message.message_id_header?{in_reply_to:message.message_id_header}:{}),references:[...new Set(refs)].slice(-20)};
  }
 }
-let draftId=null,draftTimer=null,draftGeneration=0,draftRevision=0,draftSavedRevision=0,draftWrite=Promise.resolve(),draftSent=false;
+let draftId=null,draftTimer=null,draftLoadSerial=0,draftGeneration=0,draftRevision=0,draftSavedRevision=0,draftWrite=Promise.resolve(),draftSent=false;
 const splitRecipients=id=>$(id).value.split(/[;,\n]/).map(value=>value.trim()).filter(Boolean);
 const draftPayload=()=>({
  account_id:state.account.id,to:splitRecipients("draft-to"),cc:splitRecipients("draft-cc"),
@@ -166,7 +166,7 @@ async function refreshSendReadiness(){
 function openComposer(title="Nuevo mensaje"){
  state.replyHeaders=null;
  if(!state.account){$("list-status").textContent="Selecciona un buzón antes de redactar.";return;}
- clearTimeout(draftTimer);draftGeneration++;draftRevision=0;draftSavedRevision=0;draftId=null;draftSent=false;state.pendingSend=null;
+ clearTimeout(draftTimer);draftLoadSerial++;draftGeneration++;draftRevision=0;draftSavedRevision=0;draftId=null;draftSent=false;state.pendingSend=null;
  $("compose-form").reset();$("compose-modal").querySelector(".modal-head h2").textContent=title;
  $("draft-status").textContent="Autoguardado activado. Los adjuntos se incorporan al enviar.";
  $("file-summary").innerHTML="<span>No hay archivos adjuntos.</span><strong>0 archivos · 0 MB</strong>";
@@ -177,9 +177,10 @@ async function editDraft(message){
  if(!state.account)return;
  const accountId=state.account.id;
  const generation=draftGeneration;
+ const requestId=++draftLoadSerial;
  const {draft}=await api("/api/drafts/"+encodeURIComponent(message.id));
  // Ignore an obsolete response after a mailbox switch or another composer opened.
- if(state.account?.id!==accountId||generation!==draftGeneration)return;
+ if(state.account?.id!==accountId||generation!==draftGeneration||requestId!==draftLoadSerial)return;
  if(draft.account_id!==accountId){$("list-status").textContent="Este borrador pertenece a otro buzón.";return;}
  openComposer("Editar borrador");
  const values={to:"draft-to",cc:"draft-cc",bcc:"draft-bcc"};
