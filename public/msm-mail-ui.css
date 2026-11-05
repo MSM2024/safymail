@@ -369,3 +369,15 @@ html,body{max-width:100%;overflow-x:hidden}
   #contacts-modal .modal-head,#security-modal .modal-head{min-height:48px}
   .contacts-content .compose-form{gap:8px}
 }
+
+/* P3 accessibility closeout: keyboard message discovery and resilient mobile navigation. */
+.message[tabindex="0"]{cursor:pointer}
+.message[tabindex="0"]:focus-visible{
+  position:relative;z-index:1;outline:3px solid #168cad;outline-offset:-3px;
+  background:#e9f5fb
+}
+#menu[aria-expanded="true"]{background:#e7f4fa;color:#16435d;border-radius:9px}
+@media(max-width:650px){
+  #menu{min-width:44px;min-height:44px;align-items:center;justify-content:center}
+  .sidebar.open{box-shadow:16px 0 50px rgba(6,23,44,.38)}
+}
