@@ -4,4 +4,9 @@ const source=readFileSync(new URL("./msm-resend-readonly-audit.ps1",import.meta.
 assert.ok(/^[\x00-\x7F]*$/.test(source),"PowerShell 5.1 audit must remain ASCII-safe");
 assert.ok(source.includes("AUDIT COMPLETE - No changes or email sends were performed."));
 assert.ok(!/wrangler\s+(?:secret\s+put|deploy|d1\s+migrations\s+apply)/i.test(source),"Audit must not modify remote data");
+assert.ok(source.includes("control_resend_send_requests"),"Quota audit should inspect shared provider reservation history");
+assert.ok(source.includes("daily_used") && source.includes("monthly_used"),"Quota audit must cover both UTC windows");
+assert.ok(source.includes("reserved','sent','uncertain"),"Quota audit must count pending/uncertain reservations");
+assert.ok(source.includes("external Resend sends are NOT included"),"Quota audit must disclose external-usage blind spot");
+assert.ok(!/wrangler\\s+d1\\s+execute[^\\r\\n]*\\s--command\\s+[^\\r\\n]*(?:DELETE|UPDATE|INSERT|DROP|ALTER)\\b/i.test(source),"Audit SQL must be read-only");
 console.log("MSM Resend audit PowerShell 5.1 encoding and read-only guard PASS");
