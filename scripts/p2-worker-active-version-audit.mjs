@@ -56,13 +56,13 @@ export function classifyWranglerOutput(output, expectedVersion) {
   if (typeof output !== "string") throw Error("Wrangler output must be text");
   // Wrangler 4.x lists repeated deployment blocks with Created/Version(s).
   // Never infer the active version from a list of uploaded, inactive versions.
-  const blocks=output.split(/(?=^Created:\\s+\\d{4}-\\d{2}-\\d{2}T)/m);
+  const blocks=output.split(/(?=^Created:\s+\d{4}-\d{2}-\d{2}T)/m);
   const parsed=[];
   for (const block of blocks) {
-    const date=/^Created:\\s+(\\d{4}-\\d{2}-\\d{2}T[^\\r\\n]+)/m.exec(block)?.[1]?.trim();
+    const date=/^Created:\s+(\d{4}-\d{2}-\d{2}T[^\r\n]+)/m.exec(block)?.[1]?.trim();
     if (!date || Number.isNaN(Date.parse(date))) continue;
     const versions=[];
-    const pattern=/\\(\\s*(\\d+(?:\\.\\d+)?)%\\s*\\)\\s+([a-f0-9-]{36})/gi;
+    const pattern=/\(\s*(\d+(?:\.\d+)?)%\s*\)\s+([a-f0-9-]{36})/gi;
     for (const match of block.matchAll(pattern)) {
       if (UUID.test(match[2])) versions.push({version_id:match[2],percentage:Number(match[1])});
     }
