@@ -14,7 +14,7 @@ export function evaluateQuota({localDaily,localMonthly,providerDaily=null,provid
   if(known){
     pd=counter(providerDaily,"providerDaily");
     pm=counter(providerMonthly,"providerMonthly");
-    if(typeof providerObservedAt!=="string" || !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$/.test(providerObservedAt) || !Number.isFinite(Date.parse(providerObservedAt)))
+    if(typeof providerObservedAt!=="string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/.test(providerObservedAt) || !Number.isFinite(Date.parse(providerObservedAt)))
       throw Error("Provider observation must include a valid UTC ISO-8601 timestamp");
     observedAt=new Date(providerObservedAt);
     const reference=now instanceof Date?now:new Date(now);
@@ -52,7 +52,7 @@ function readArgs(args) {
     params[m[1]]=m[2];
   }
   for(const field of ["local-daily","local-monthly"])if(!(field in params))throw Error("Missing "+field);
-  const asInt=(name)=>params[name]===undefined?null:/^\\d+$/.test(params[name])?Number(params[name]):NaN;
+  const asInt=(name)=>params[name]===undefined?null:/^\d+$/.test(params[name])?Number(params[name]):NaN;
   return {localDaily:asInt("local-daily"),localMonthly:asInt("local-monthly"),
     providerDaily:asInt("provider-daily"),providerMonthly:asInt("provider-monthly"),
     providerObservedAt:params["provider-observed-at"]??null};
