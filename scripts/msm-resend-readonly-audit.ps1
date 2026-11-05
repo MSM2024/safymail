@@ -68,4 +68,27 @@ try{
    @($parsed)[0].results | Format-Table domain,status,provider_status -AutoSize
  }
 }catch{Write-Host "Control D1 query failed" -ForegroundColor Yellow}
+Write-Host ""
+Write-Host "=== RESEND FREE QUOTA: CONTROL PLANE LOCAL COUNTS (READ-ONLY) ==="
+Write-Host "Limits: 100/day, 3000/month (UTC), shared by provider account."
+Write-Host "Counts include reserved, sent and uncertain; external Resend sends are NOT included."
+try {
+ $quotaSql="SELECT COALESCE(SUM(CASE WHEN r.day_key=date('now') AND r.status IN ('reserved','sent','uncertain') THEN 1 ELSE 0 END),0) AS daily_used, COALESCE(SUM(CASE WHEN r.month_key=strftime('%Y-%m','now') AND r.status IN ('reserved','sent','uncertain') THEN 1 ELSE 0 END),0) AS monthly_used FROM control_installations i LEFT JOIN control_resend_send_requests r ON r.provider_account_id=i.provider_account_id WHERE i.domain='$domainSafe' AND i.provider_account_id IS NOT NULL;"
+ $quotaOut=& npx --no-install wrangler d1 execute msm-mail-control-db --config wrangler.control-plane.toml --remote --json --command $quotaSql 2>$null
+ if($LASTEXITCODE -ne 0){Write-Host "Resend quota counters unavailable" -ForegroundColor Yellow}
+ else {
+   $quotaJson=$quotaOut|Out-String|ConvertFrom-Json
+   $quotaRow=@(@($quotaJson)[0].results)[0]
+   if($null -eq $quotaRow -or $null -eq $quotaRow.daily_used -or $null -eq $quotaRow.monthly_used){
+     Write-Host "Resend quota counters could not be parsed" -ForegroundColor Yellow
+   } else {
+     $daily=[int]$quotaRow.daily_used
+     $monthly=[int]$quotaRow.monthly_used
+     Write-Host ("Today UTC: {0}/100 | Current month UTC: {1}/3000" -f $daily,$monthly)
+     if($daily -ge 100 -or $monthly -ge 3000){Write-Host "ALERT: LOCAL QUOTA EXHAUSTED - do not send more tests." -ForegroundColor Red}
+     elseif($daily -ge 80 -or $monthly -ge 2400){Write-Host "CAUTION: 80 percent local quota reached - reserve capacity for real mail." -ForegroundColor Yellow}
+     else{Write-Host "Local quota below 80 percent; still confirm account-wide usage in Resend." -ForegroundColor Green}
+   }
+ }
+}catch{Write-Host "Resend quota read-only query failed" -ForegroundColor Yellow}
 Write-Host "AUDIT COMPLETE - No changes or email sends were performed." -ForegroundColor Green
