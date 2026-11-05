@@ -1279,11 +1279,31 @@ app.post("/api/messages/send", async (c) => {
     messageId = existing.id;
   } else {
     messageId = newId();
-    const conversationId = newId();
-    await c.env.DB.batch([
-      c.env.DB.prepare(
-        "INSERT INTO conversations (id, company_id, account_id, subject, last_message_at) VALUES (?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
-      ).bind(conversationId, account.company_id, accountId, subject),
+    // Replies retain the conversation associated with the referenced message
+    // in this mailbox. Never resolve a thread by subject or across accounts.
+    const threadCandidates = [...new Set([inReplyTo, ...references.split(" ")].filter(Boolean))].slice(-20);
+    let conversationId: string | null = null;
+    if (threadCandidates.length) {
+      const placeholders = threadCandidates.map(() => "?").join(",");
+      const prior = await c.env.DB.prepare(
+        `SELECT m.conversation_id FROM messages m
+         JOIN conversations co ON co.id = m.conversation_id AND co.account_id = m.account_id
+         WHERE m.account_id = ? AND m.message_id_header IN (${placeholders})
+           AND m.conversation_id IS NOT NULL
+         ORDER BY m.created_at DESC LIMIT 1`
+      ).bind(accountId, ...threadCandidates).first<{ conversation_id: string }>();
+      conversationId = prior?.conversation_id || null;
+    }
+    const createsConversation = !conversationId;
+    if (!conversationId) conversationId = newId();
+    const statements: D1PreparedStatement[] = [
+      createsConversation
+        ? c.env.DB.prepare(
+            "INSERT INTO conversations (id, company_id, account_id, subject, last_message_at) VALUES (?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
+          ).bind(conversationId, account.company_id, accountId, subject)
+        : c.env.DB.prepare(
+            "UPDATE conversations SET last_message_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND account_id=? AND company_id=?"
+          ).bind(conversationId,accountId,account.company_id),
       c.env.DB.prepare(
         `INSERT INTO messages
           (id, company_id, account_id, conversation_id, direction, folder, from_address,
@@ -1292,7 +1312,8 @@ app.post("/api/messages/send", async (c) => {
          VALUES (?, ?, ?, ?, 'outbound', 'sent', ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'queued', ?)`
       ).bind(messageId, account.company_id, accountId, conversationId, from,
         JSON.stringify(to), JSON.stringify(cc), JSON.stringify(bcc), subject, textBody, inReplyTo || null, references || null, JSON.stringify(attachments.map(item=>item.hash).sort()), requestId)
-    ]);
+    ];
+    await c.env.DB.batch(statements);
   }
 
 
