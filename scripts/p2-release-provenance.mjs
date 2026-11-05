@@ -61,6 +61,15 @@ function git(args) {
   return execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 }
 
+export function gitFileAtCommit(commit, relativePath, exec = execFileSync) {
+  if (!gitSha.test(commit) || !["src/index.ts", "public/index.html"].includes(relativePath)) {
+    throw Error("invalid Git revision or manifest file");
+  }
+  return exec("git", ["show", commit + ":" + relativePath], {
+    cwd: root, stdio: ["ignore", "pipe", "pipe"], maxBuffer: 8 * 1024 * 1024
+  });
+}
+
 async function main() {
   const mode = process.argv[2];
   if (!["prepare", "verify"].includes(mode)) {
@@ -83,13 +92,25 @@ async function main() {
     return;
   }
   const remote = await readPublishedRelease();
-  const result = compareRelease(remote, commit, source, shell);
-  console.log("P2 RELEASE PROVENANCE: " + JSON.stringify({ result, status: remote.status ?? null, expectedCommit: commit, publishedCommit: remote.manifest?.commit ?? null }));
+  let result = remote.result;
+  const publishedCommit = remote.manifest?.commit ?? null;
+  if (remote.result === "published") {
+    // A release is allowed to lag behind main. Compare against the exact Git
+    // tree claimed by the public manifest, not the latest checkout HEAD.
+    try {
+      const historicalSource = gitFileAtCommit(publishedCommit, "src/index.ts");
+      const historicalShell = gitFileAtCommit(publishedCommit, "public/index.html");
+      result = compareRelease(remote, publishedCommit, historicalSource, historicalShell);
+    } catch {
+      result = "published-commit-unavailable-locally";
+    }
+  }
+  console.log("P2 RELEASE PROVENANCE: " + JSON.stringify({ result, status: remote.status ?? null, localHead: commit, publishedCommit }));
   if (result !== "manifest-match") {
-    console.error("P2-01 NOT VERIFIED: compare a prepared and deployed release before asserting identity.");
+    console.error("P2-01 NOT VERIFIED: published manifest does not match an accessible Git revision.");
     process.exitCode = 1;
   } else {
-    console.log("Manifest matches local Git SHA and source fingerprints. Confirm Cloudflare Worker version ID separately from deploy output.");
+    console.log("Published manifest matches the referenced Git tree (HEAD may be newer). This is a manifest integrity check; confirm deployed Worker version ID and live bundle attestation separately.");
   }
 }
 
