@@ -37,6 +37,7 @@ security.patch("/profile", async (c) => {
 
 security.post("/password", async (c) => {
   const user = c.get("user");
+  if (user.isSuperadmin && !user.mfaVerified) return c.json({error:"mfa_verification_required"},403);
   const body = await c.req.json<{ current_password?: string; new_password?: string }>().catch(() => ({} as any));
   if (typeof body.current_password !== "string" || body.current_password.length > 256 || !validPassword(body.new_password)) {
     return c.json({ error: "invalid_password", message: "Indica tu contraseña actual y una nueva contraseña de al menos 12 caracteres." }, 400);

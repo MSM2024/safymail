@@ -99,6 +99,9 @@ auth.post("/login", async c => {
   }
   await c.env.DB.prepare("DELETE FROM auth_login_attempts WHERE ip_hash=? AND email=?").bind(ipHash,email).run();
   await c.env.DB.prepare("UPDATE users SET last_login_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?").bind(user.id).run();
+  if (user.totp_enabled_at && !user.totp_secret_ciphertext) {
+    return c.json({error:"mfa_unavailable"},503);
+  }
   if(user.totp_enabled_at && user.totp_secret_ciphertext){
     const token=base64Token(), tokenHash=await sha256Hex(token), id=crypto.randomUUID();
     await c.env.DB.prepare("DELETE FROM auth_mfa_challenges WHERE user_id=? OR expires_at<=?")
