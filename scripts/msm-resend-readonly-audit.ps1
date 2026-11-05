@@ -1,5 +1,10 @@
 #Requires -Version 5.1
-param([string]$Domain = "msmmystore.com")
+param(
+ [string]$Domain = "msmmystore.com",
+ [Nullable[int]]$ProviderDaily = $null,
+ [Nullable[int]]$ProviderMonthly = $null,
+ [string]$ProviderObservedAtUtc = ""
+)
 $ErrorActionPreference = "Continue"
 Set-Location (Split-Path -Parent $PSScriptRoot)
 Write-Host "MSM MAIL - RESEND READ-ONLY AUDIT" -ForegroundColor Cyan
@@ -85,9 +90,17 @@ try {
      $daily=[int]$quotaRow.daily_used
      $monthly=[int]$quotaRow.monthly_used
      Write-Host ("Today UTC: {0}/100 | Current month UTC: {1}/3000" -f $daily,$monthly)
+     Write-Host ("Local observation UTC: {0}" -f ([DateTime]::UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ")))
+     $quotaArgs=@("./scripts/p2-resend-quota-reconcile.mjs",("--local-daily="+$daily),("--local-monthly="+$monthly))
+     if($PSBoundParameters.ContainsKey("ProviderDaily")){$quotaArgs+=("--provider-daily="+$ProviderDaily.Value)}
+     if($PSBoundParameters.ContainsKey("ProviderMonthly")){$quotaArgs+=("--provider-monthly="+$ProviderMonthly.Value)}
+     if($ProviderObservedAtUtc -ne ""){$quotaArgs+=("--provider-observed-at="+$ProviderObservedAtUtc)}
+     Write-Host "=== P2 ACCOUNT QUOTA RECONCILIATION (READ-ONLY) ==="
+     & node $quotaArgs
+     if($LASTEXITCODE -ne 0){Write-Host "P2 quota reconciliation could not certify provider observation." -ForegroundColor Yellow}
      if($daily -ge 100 -or $monthly -ge 3000){Write-Host "ALERT: LOCAL QUOTA EXHAUSTED - do not send more tests." -ForegroundColor Red}
      elseif($daily -ge 80 -or $monthly -ge 2400){Write-Host "CAUTION: 80 percent local quota reached - reserve capacity for real mail." -ForegroundColor Yellow}
-     else{Write-Host "Local quota below 80 percent; still confirm account-wide usage in Resend." -ForegroundColor Green}
+     else{Write-Host "Local quota below 80 percent; account-wide quota remains UNKNOWN until provider counters are supplied." -ForegroundColor Yellow}
    }
  }
 }catch{Write-Host "Resend quota read-only query failed" -ForegroundColor Yellow}
