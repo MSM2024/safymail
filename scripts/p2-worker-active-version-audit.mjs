@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
@@ -74,11 +74,17 @@ export function classifyWranglerOutput(output, expectedVersion) {
 
 export function readWranglerDeployment(expectedVersion, run = spawnSync) {
   if (!UUID.test(expectedVersion)) throw Error("Invalid expected Cloudflare Worker version ID");
-  const command=process.platform==="win32"?"npx.cmd":"npx";
-  const args=["--no-install","wrangler","deployments","list","--config","wrangler.toml"];
+  // Execute Wrangler's installed JS CLI with Node directly. On Windows,
+  // spawning npx.cmd with shell:true causes Node DEP0190, and shell:false
+  // may fail for .cmd shims. A fixed JS entrypoint avoids both concerns.
+  const wranglerCli=path.join(ROOT,"node_modules","wrangler","bin","wrangler.js");
+  if (run===spawnSync && !existsSync(wranglerCli))
+    throw Error("Local Wrangler CLI not installed; run npm install before auditing");
+  const command=process.execPath;
+  const args=[wranglerCli,"deployments","list","--config","wrangler.toml"];
   const outcome=run(command,args,{
     cwd:ROOT,encoding:"utf8",timeout:30000,maxBuffer:2*1024*1024,
-    shell:process.platform==="win32",windowsHide:true
+    shell:false,windowsHide:true
   });
   if(outcome.error || outcome.status!==0) throw Error("Wrangler read-only deployment listing unavailable");
   return classifyWranglerOutput(outcome.stdout,expectedVersion);
