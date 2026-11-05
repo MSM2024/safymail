@@ -2,6 +2,20 @@
 
 Date: 2026-11-05. Target existing Worker **msm-mail-preview**, custom domain `mailme.msmmystore.com`. Deploy must occur only from the authorized checkout with its existing, private `wrangler.toml` and authenticated Wrangler session. Do not use temporary deployment or automatic project setup, and do not deploy `msm-mail-control-plane` when updating this UI.
 
+## Remote layout: original template versus MSM release repository
+
+This working copy was cloned from `https://github.com/alexeiderc/safymail.git` as `origin`. **Do not overwrite `origin`**, and never use `origin/main` as release evidence. Configure a second verified remote named `msm` once:
+
+```powershell
+git remote add msm https://github.com/MSM2024/safymail.git
+git fetch msm main
+git switch main
+git merge --ff-only msm/main
+npm run qa:p3:deploy:preflight
+```
+
+If the `msm` remote already exists, verify its URL via `git remote get-url msm` and use `git fetch msm main`; do not blindly replace it. Abort if the histories diverge rather than forcing a merge. The P3 script reads `refs/remotes/msm/main` and validates the literal approved GitHub remote URL before comparing commits. Optional `MSM_RELEASE_REMOTE` can select a different **approved** remote name. `msm/main` is the release source; `origin` remains the original template.
+
 ## 1. Operator commands: safe gates, then explicit deploy
 
 **Corrección tras prueba del operador (2026-11-05):** este repositorio NO contiene `package-lock.json`, por lo que `npm ci` da `EUSAGE` y no demuestra un fallo de la aplicación. Usa `npm install --no-package-lock` para instalar las versiones permitidas por `package.json` sin crear un lockfile local. Este método es **menos reproducible** que una instalación bloqueada; la tarea futura es incorporar un lockfile versionado y sustituirlo por `npm ci`. No ejecutes deploy si algún gate falla: PowerShell no cancela automáticamente una lista de comandos después de un error de npm.
@@ -11,9 +25,9 @@ El registro enviado termina durante la lista de pruebas (en `Spam list includes`
 Run in `C:\Users\cm8ms\tet\msm-mail`, PowerShell, on `main` after closing the PR. Stop immediately on any nonzero exit status; check `$LASTEXITCODE` after each executable, including Wrangler.
 
 ```powershell
-git fetch origin
+git fetch msm main
 git switch main
-git pull --ff-only origin main
+git merge --ff-only msm/main
 npm install --no-package-lock
 if ($LASTEXITCODE -ne 0) { throw "Instalación de dependencias fallida" }
 npm test
