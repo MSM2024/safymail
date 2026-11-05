@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { extractAccountId, classifyDeployments, readCloudflareDeployment } from "./p2-worker-active-version-audit.mjs";
+import { extractAccountId, classifyDeployments, classifyWranglerOutput, readWranglerDeployment, readCloudflareDeployment } from "./p2-worker-active-version-audit.mjs";
 
 const expected="94a7ed90-9478-4cc6-b339-97d6ca23d2b4";
 const other="a423e816-61f9-455e-9ac0-208c297d2ebb";
@@ -31,4 +31,29 @@ test("read-only API uses GET fixed worker and no secret disclosure",async()=>{
 test("fails closed on invalid API response or status",async()=>{
  await assert.rejects(readCloudflareDeployment("a".repeat(32),"private-token-not-for-output",async()=>new Response("no",{status:403})),/HTTP 403/);
  await assert.rejects(readCloudflareDeployment("a".repeat(32),"private-token-not-for-output",async()=>new Response(JSON.stringify({success:false,result:[]}))),/invalid deployment response/);
+});
+
+test("Wrangler 4 text parser selects latest deployment with 100 percent traffic", () => {
+  const sample=[
+    "Created:     2026-11-05T16:01:12.122Z",
+    "Version(s):  (100%) a423e816-61f9-455e-9ac0-208c297d2ebb",
+    "Created:     2026-11-05T17:37:15.766Z",
+    "Version(s):  (100%) 94a7ed90-9478-4cc6-b339-97d6ca23d2b4"
+  ].join("\n");
+  assert.equal(classifyWranglerOutput(sample,expected).result,"expected-version-at-100-percent");
+  assert.equal(classifyWranglerOutput(sample,other).result,"deployment-version-mismatch");
+  const split=sample.replace("(100%) 94a7", "(75%) 94a7");
+  assert.equal(classifyWranglerOutput(split,expected).result,"deployment-version-mismatch");
+  assert.equal(classifyWranglerOutput("Not a deployment",expected).result,"unreadable-deployments");
+});
+test("Wrangler fallback only reads deployment listing with safe fixed arguments",()=>{
+  let seen;
+  const out=readWranglerDeployment(expected,(cmd,args,options)=>{
+    seen={cmd,args,options};
+    return {status:0,stdout:"Created: 2026-11-05T17:37:15.766Z\nVersion(s): (100%) "+expected};
+  });
+  assert.equal(out.result,"expected-version-at-100-percent");
+  assert.deepEqual(seen.args,["--no-install","wrangler","deployments","list","--config","wrangler.toml"]);
+  assert.equal(seen.options.windowsHide,true);
+  assert.throws(()=>readWranglerDeployment(expected,()=>({status:1,stdout:""})),/unavailable/);
 });
