@@ -1,3 +1,4 @@
+import { isValidResendWebhookSecret } from "./webhook-secret-validation";
 import { Hono } from "hono";
 import { sealCredentials, openCredentials, processProvisioningJob, deriveMaintenanceToken, deriveResendRelayToken, openProvisioningSecret, sealSecret } from "./provisioning-jobs";
 import { processMaintenanceBatch } from "./maintenance-jobs";
@@ -434,7 +435,7 @@ app.post("/api/installations/:id/resend-webhook-secret", async c => {
   try { body = JSON.parse(raw); } catch { return fail(c, 400, "invalid_json"); }
   const secret = (body && typeof body === "object" && "signing_secret" in body)
     ? (body as { signing_secret?: unknown }).signing_secret : undefined;
-  if (typeof secret !== "string" || !/^whsec_[A-Za-z0-9_=-]{16,512}$/.test(secret)) {
+  if (typeof secret !== "string" || !/^whsec_[A-Za-z0-9+/=]{16,512}$/.test(secret) || !isValidResendWebhookSecret(secret)) {
     return fail(c, 400, "invalid_webhook_signing_secret");
   }
   const installation = await c.env.CONTROL_DB.prepare(
