@@ -101,12 +101,23 @@ async function main() {
       const historicalSource = gitFileAtCommit(publishedCommit, "src/index.ts");
       const historicalShell = gitFileAtCommit(publishedCommit, "public/index.html");
       result = compareRelease(remote, publishedCommit, historicalSource, historicalShell);
+      if (result === "source-mismatch" || result === "shell-mismatch") {
+        const windowsText = (bytes) => Buffer.from(bytes.toString("utf8").replace(/\\r?\\n/g, "\\r\\n"));
+        const attempts = [
+          [windowsText(historicalSource), historicalShell],
+          [historicalSource, windowsText(historicalShell)],
+          [windowsText(historicalSource), windowsText(historicalShell)]
+        ];
+        if (attempts.some(([src, html]) => compareRelease(remote, publishedCommit, src, html) === "manifest-match")) {
+          result = "manifest-match-windows-checkout";
+        }
+      }
     } catch {
       result = "published-commit-unavailable-locally";
     }
   }
   console.log("P2 RELEASE PROVENANCE: " + JSON.stringify({ result, status: remote.status ?? null, localHead: commit, publishedCommit }));
-  if (result !== "manifest-match") {
+  if (result !== "manifest-match" && result !== "manifest-match-windows-checkout") {
     console.error("P2-01 NOT VERIFIED: published manifest does not match an accessible Git revision.");
     process.exitCode = 1;
   } else {
