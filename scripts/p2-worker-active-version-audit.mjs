@@ -91,10 +91,12 @@ async function main() {
     process.exitCode=2;return;
   }
   const token=process.env.CLOUDFLARE_API_TOKEN;
-  const config=readFileSync(path.join(ROOT,"wrangler.toml"),"utf8");
-  const account=extractAccountId(config);
+  // Wrangler's authenticated read-only listing parses wrangler.toml itself.
+  // It does not require an account ID or a second manual TOML parser.
+  // Retain strict account and Worker validation for the direct API path only.
   const result=token
-    ? classifyDeployments(await readCloudflareDeployment(account,token),expected)
+    ? classifyDeployments(await readCloudflareDeployment(
+        extractAccountId(readFileSync(path.join(ROOT,"wrangler.toml"),"utf8")),token),expected)
     : readWranglerDeployment(expected);
   console.log("P2 WORKER AUDIT METHOD: "+(token?"cloudflare-api":"wrangler-existing-login"));
   console.log("P2 WORKER ACTIVE VERSION: "+JSON.stringify({worker:SCRIPT,expectedVersion:expected,...result}));
