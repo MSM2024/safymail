@@ -24,4 +24,10 @@ assert.ok(!/Write-Host[^\\r\\n]*(?:payload_json|lock_token|idempotency_key|provi
 assert.ok(source.includes("ProviderObservedAtUtc") && source.includes("ProviderDaily") && source.includes("ProviderMonthly"),"P2 provider observations must require paired counters and UTC evidence");
 assert.ok(source.includes("p2-resend-quota-reconcile.mjs") && source.includes("& node @quotaArgs"),"P2 PowerShell reconciliation must invoke pure Node helper");
 assert.ok(source.includes("account-wide quota remains UNKNOWN"),"P2 must not present unconfirmed provider headroom as safe");
+assert.ok(source.includes("P2 WEBHOOK EVENT LINEAGE") && source.includes("LEFT JOIN control_webhook_events e"),"P2 webhook lineage must link deliveries to provider events");
+assert.ok(source.includes("orphan_deliveries") && source.includes("pending_stale_1h") && source.includes("delivered_without_timestamp"),"P2 webhook lineage must report orphan and stalled states");
+assert.ok(source.includes("COUNT(DISTINCT CASE WHEN d.status='delivered'"),"P2 must distinguish distinct forwarded event count");
+assert.ok(source.includes("HAVING COUNT(*)>1") && source.includes("duplicate_groups"),"P2 must audit duplicate provider event storage keys");
+assert.ok(source.includes("repeat HTTP deliveries may be suppressed before storage"),"P2 event dedup cannot claim to observe attempts suppressed before persistence");
+assert.ok(!/Write-Host[^\\r\\n]*(?:payload_json|provider_event_id|last_error|svix-signature)/i.test(source),"Never print raw webhook metadata, payloads, IDs or signatures");
 console.log("MSM Resend audit PowerShell 5.1 encoding and read-only guard PASS");
