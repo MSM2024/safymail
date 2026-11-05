@@ -80,7 +80,7 @@ app.use("/api/*", async (c, next) => {
   c.header("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
   c.header("Cross-Origin-Resource-Policy", "same-origin");
   const path = c.req.path;
-  if (path === "/api/health" || path === "/api/webhooks/resend" || path.startsWith("/api/auth/")) return next();
+  if (path === "/api/health" || path === "/api/branding" || path === "/api/webhooks/resend" || path.startsWith("/api/auth/")) return next();
   if (["POST", "PUT", "PATCH", "DELETE"].includes(c.req.method)) {
     const origin = c.req.header("Origin");
     if (!origin || origin !== new URL(c.req.url).origin) return c.json({ error: "csrf_origin_rejected" }, 403);
@@ -90,7 +90,7 @@ app.use("/api/*", async (c, next) => {
 
 app.use("/api/*", async (c, next) => {
   const path = c.req.path;
-  if (path === "/api/health" || path === "/api/webhooks/resend" || path.startsWith("/api/auth/")) {
+  if (path === "/api/health" || path === "/api/branding" || path === "/api/webhooks/resend" || path.startsWith("/api/auth/")) {
     return next();
   }
   const user = c.get("user");
