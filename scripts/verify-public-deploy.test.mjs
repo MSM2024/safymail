@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {classify, verify, comparePublicShells, classifyRedirect, EXPECTED, OLD} from "./verify-public-deploy.mjs";
+import {classify, verify, comparePublicShells, classifyRedirect, EXPECTED, OLD, TARGET} from "./verify-public-deploy.mjs";
 
 test("classifies current, stale and unknown public login shells", () => {
   assert.equal(classify("<html>" + EXPECTED + "</html>"), "current");
