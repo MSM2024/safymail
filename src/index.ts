@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { receiveEmail } from "./email/inbound";
 import { parseDraftReplyHeaders } from "./email/draft-reply";
+import { DRAFT_FIELDS, getDraftVersion, type DraftVersionFields } from "./email/draft-version";
 import { arrayBufferToBase64, isAllowedAttachment, parseOutboundAttachments } from "./email/attachments";
 import { releaseMailStorage, reserveMailStorage } from "./email/storage";
 import { verifyResendWebhook } from "./email/webhooks";
@@ -1402,7 +1403,7 @@ async function authorizeDraft(c: any, id: string) {
 app.get("/api/drafts/:id", async (c) => {
   const draft = await authorizeDraft(c,c.req.param("id"));
   if (!draft) return c.json({error:"draft_not_found"},404);
-  return c.json({draft});
+  return c.json({draft:{...draft,version:await getDraftVersion(draft as DraftVersionFields)}});
 });
 
 app.delete("/api/drafts/:id", async (c) => {
@@ -1452,14 +1453,18 @@ app.post("/api/drafts", async (c) => {
      VALUES (?, ?, ?, 'outbound', 'drafts', ?, ?, ?, ?, ?, ?, ?, ?, 1)`
   ).bind(id, account.company_id, accountId, from, JSON.stringify(to), JSON.stringify(cc),
     JSON.stringify(bcc), subject, textBody, replyHeaders.inReplyTo, replyHeaders.references).run();
-  return c.json({ draft: { id, accountId, from, to, cc, bcc, subject } }, 201);
+  const version=await getDraftVersion({
+    to_addresses:JSON.stringify(to),cc_addresses:JSON.stringify(cc),bcc_addresses:JSON.stringify(bcc),
+    subject,text_body:textBody,in_reply_to:replyHeaders.inReplyTo,references_header:replyHeaders.references
+  });
+  return c.json({ draft: { id, accountId, from, to, cc, bcc, subject,version } }, 201);
 });
 
 app.patch("/api/drafts/:id", async (c) => {
   const user = c.get("user");
   const id = c.req.param("id");
   const body = await c.req.json<{
-    to?: unknown; cc?: unknown; bcc?: unknown; subject?: string; text_body?: string; in_reply_to?: unknown; references?: unknown;
+    to?: unknown; cc?: unknown; bcc?: unknown; subject?: string; text_body?: string; in_reply_to?: unknown; references?: unknown; if_match?:string;
   }>().catch(() => ({} as any));
   const to = parseRecipients(body.to);
   const cc = parseRecipients(body.cc);
@@ -1474,12 +1479,12 @@ app.patch("/api/drafts/:id", async (c) => {
   }
   const access = user.isSuperadmin
     ? await c.env.DB.prepare(
-        `SELECT m.id FROM messages m JOIN email_accounts ea ON ea.id = m.account_id
+        `SELECT m.id,m.to_addresses,m.cc_addresses,m.bcc_addresses,m.subject,m.text_body,m.in_reply_to,m.references_header FROM messages m JOIN email_accounts ea ON ea.id = m.account_id
          JOIN companies co ON co.id = ea.company_id
          WHERE m.id = ? AND m.folder = 'drafts' AND ea.status = 'active' AND co.status = 'active'`
       ).bind(id).first()
     : await c.env.DB.prepare(
-        `SELECT m.id FROM messages m JOIN email_accounts ea ON ea.id = m.account_id
+        `SELECT m.id,m.to_addresses,m.cc_addresses,m.bcc_addresses,m.subject,m.text_body,m.in_reply_to,m.references_header FROM messages m JOIN email_accounts ea ON ea.id = m.account_id
          JOIN companies co ON co.id = ea.company_id
          JOIN company_memberships cm ON cm.company_id = ea.company_id AND cm.user_id = ?
          JOIN account_permissions ap ON ap.account_id = ea.id AND ap.user_id = ?
@@ -1488,6 +1493,10 @@ app.patch("/api/drafts/:id", async (c) => {
            AND (? IS NULL OR ea.company_id = ?)`
       ).bind(user.id, user.id, id, c.get("hostCompanyId"), c.get("hostCompanyId")).first();
   if (!access) return c.json({ error: "draft_not_found" }, 404);
+  if(!/^[a-f0-9]{64}$/.test(body.if_match||"") ||
+     body.if_match!==await getDraftVersion(access as DraftVersionFields)){
+    return c.json({error:"draft_conflict",message:"Otro dispositivo modificó este borrador. Vuelve a abrirlo antes de guardar."},409);
+  }
   const sets: string[] = [];
   const values: (string | number)[] = [];
   if (body.to !== undefined) { sets.push("to_addresses = ?"); values.push(JSON.stringify(to)); }
@@ -1498,6 +1507,10 @@ app.patch("/api/drafts/:id", async (c) => {
   if (body.in_reply_to !== undefined) { sets.push("in_reply_to = ?"); values.push(replyHeaders.inReplyTo as string); }
   if (body.references !== undefined) { sets.push("references_header = ?"); values.push(replyHeaders.references as string); }
   values.push(id);
+  // Compare all original draft columns in the same write to reject concurrent edits.
+  const observed=access as DraftVersionFields;
+  const fieldsGuard=DRAFT_FIELDS.map(name=>name+" IS ?").join(" AND ");
+  const originalValues=DRAFT_FIELDS.map(name=>observed[name]);
   const guard = user.isSuperadmin ? "" : ` AND EXISTS (
     SELECT 1 FROM email_accounts ea
     JOIN companies co ON co.id=ea.company_id AND co.status='active'
@@ -1507,10 +1520,19 @@ app.patch("/api/drafts/:id", async (c) => {
     WHERE ea.id=messages.account_id AND ea.status='active'
       AND ea.company_id=?
   )`;
-  const args = user.isSuperadmin ? values : [...values,user.id,user.id,c.get("hostCompanyId")];
-  const result=await c.env.DB.prepare(`UPDATE messages SET ${sets.join(", ")} WHERE id = ? AND folder='drafts'`+guard).bind(...args).run();
-  if((result.meta.changes??0)!==1)return c.json({error:"draft_not_found"},404);
-  return c.json({ id, updated: true });
+  const args = user.isSuperadmin
+    ? [...values,...originalValues] : [...values,...originalValues,user.id,user.id,c.get("hostCompanyId")];
+  const result=await c.env.DB.prepare(`UPDATE messages SET ${sets.join(", ")} WHERE id = ? AND folder='drafts' AND `+fieldsGuard+guard).bind(...args).run();
+  if((result.meta.changes??0)!==1)return c.json({error:"draft_conflict",message:"El borrador cambió mientras se guardaba. Vuelve a abrirlo."},409);
+  const nextFields:DraftVersionFields={...observed};
+  if(body.to!==undefined)nextFields.to_addresses=JSON.stringify(to);
+  if(body.cc!==undefined)nextFields.cc_addresses=JSON.stringify(cc);
+  if(body.bcc!==undefined)nextFields.bcc_addresses=JSON.stringify(bcc);
+  if(subject!==undefined)nextFields.subject=subject;
+  if(textBody!==undefined)nextFields.text_body=textBody;
+  if(body.in_reply_to!==undefined)nextFields.in_reply_to=replyHeaders.inReplyTo;
+  if(body.references!==undefined)nextFields.references_header=replyHeaders.references;
+  return c.json({id,updated:true,version:await getDraftVersion(nextFields)});
 });
 
 
