@@ -82,7 +82,6 @@ async function main() {
     console.log("No Worker deployed, no DNS, secrets, database or mail changed.");
     return;
   }
-  if (!readFileSync) throw Error("unreachable");
   const remote = await readPublishedRelease();
   const result = compareRelease(remote, commit, source, shell);
   console.log("P2 RELEASE PROVENANCE: " + JSON.stringify({ result, status: remote.status ?? null, expectedCommit: commit, publishedCommit: remote.manifest?.commit ?? null }));
