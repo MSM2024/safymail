@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { makeManifest, validateManifest, readPublishedRelease, compareRelease, gitFileAtCommit, TARGET } from "./p2-release-provenance.mjs";
+import { makeManifest, validateManifest, readPublishedRelease, compareRelease, compareHistoricalRelease, gitFileAtCommit, TARGET } from "./p2-release-provenance.mjs";
 
 const sha = "a".repeat(40);
 const manifest = makeManifest(sha, Buffer.from("worker"), Buffer.from("shell"), "2026-11-05T12:00:00.000Z");
@@ -61,4 +61,12 @@ test("published manifest can match historical Git bytes while HEAD has advanced"
   const older = makeManifest(sha, "older-worker", "older-shell", "2026-11-05T17:35:25Z");
   assert.equal(compareRelease({result:"published",manifest:older}, sha, "older-worker", "older-shell"), "manifest-match");
   assert.equal(compareRelease({result:"published",manifest:older}, "b".repeat(40), "older-worker", "older-shell"), "commit-mismatch");
+});
+
+test("Windows legacy manifest with CRLF is compared against historical LF Git blobs", () => {
+  const lf = "first\nsecond\n";
+  const crlf = lf.replace(/\n/g,"\r\n");
+  const old = makeManifest(sha,crlf,crlf,"2026-11-05T17:35:25Z");
+  assert.equal(compareHistoricalRelease({result:"published",manifest:old},sha,Buffer.from(lf),Buffer.from(lf)),"manifest-match-windows-checkout");
+  assert.equal(compareHistoricalRelease({result:"published",manifest:old},sha,Buffer.from("altered"),Buffer.from(lf)),"source-mismatch");
 });

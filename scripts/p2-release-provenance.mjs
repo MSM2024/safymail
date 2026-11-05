@@ -57,6 +57,22 @@ export function compareRelease(published, expectedCommit, source, shell) {
   return "manifest-match";
 }
 
+export function compareHistoricalRelease(remote, commit, historicalSource, historicalShell) {
+  let result = compareRelease(remote, commit, historicalSource, historicalShell);
+  if (result === "source-mismatch" || result === "shell-mismatch") {
+    const windowsText = (bytes) => Buffer.from(bytes.toString("utf8").replace(/\r?\n/g, "\r\n"));
+    const attempts = [
+      [windowsText(historicalSource), historicalShell],
+      [historicalSource, windowsText(historicalShell)],
+      [windowsText(historicalSource), windowsText(historicalShell)]
+    ];
+    if (attempts.some(([src, html]) => compareRelease(remote, commit, src, html) === "manifest-match")) {
+      result = "manifest-match-windows-checkout";
+    }
+  }
+  return result;
+}
+
 function git(args) {
   return execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 }
@@ -84,7 +100,7 @@ async function main() {
     if (git(["status", "--porcelain", "--untracked-files=no"]) !== "") {
       throw Error("tracked working tree must be clean before preparing a release");
     }
-    const manifest = makeManifest(commit, source, shell, new Date().toISOString());
+    const manifest = makeManifest(commit, gitFileAtCommit(commit, "src/index.ts"), gitFileAtCommit(commit, "public/index.html"), new Date().toISOString());
     writeFileSync(file, JSON.stringify(manifest, null, 2) + "\n", { flag: "w" });
     console.log("P2 RELEASE PREPARED (local assets only): " + manifest.commit);
     console.log("Manifest: public/msm-release.json");
@@ -100,13 +116,13 @@ async function main() {
     try {
       const historicalSource = gitFileAtCommit(publishedCommit, "src/index.ts");
       const historicalShell = gitFileAtCommit(publishedCommit, "public/index.html");
-      result = compareRelease(remote, publishedCommit, historicalSource, historicalShell);
+      result = compareHistoricalRelease(remote, publishedCommit, historicalSource, historicalShell);
     } catch {
       result = "published-commit-unavailable-locally";
     }
   }
   console.log("P2 RELEASE PROVENANCE: " + JSON.stringify({ result, status: remote.status ?? null, localHead: commit, publishedCommit }));
-  if (result !== "manifest-match") {
+  if (result !== "manifest-match" && result !== "manifest-match-windows-checkout") {
     console.error("P2-01 NOT VERIFIED: published manifest does not match an accessible Git revision.");
     process.exitCode = 1;
   } else {
