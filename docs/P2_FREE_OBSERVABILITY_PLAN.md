@@ -81,6 +81,34 @@ The second read-only audit reports **66 dispatch rows / 66 distinct slots in 24h
 
 Added pure read-only latest-slot comparator `scripts/p2-maintenance-completion.mjs`: an observed healthy latest slot requires matching dispatch/completion slots, a recent timestamp (at most 30 minutes) and valid D1 lock state. Any mismatch, stale record, or unavailable data is flagged as alert/unknown; the report never equates a dispatch claim with queue execution. Cloudflare Queue pending counts, retry counts and DLQ depth remain external evidence.
 
+## P2-05 / P2-06 / P2-07 — closure controls and read-only runbook
+
+**No global P2 GO is claimed from CI or D1-only evidence.** The local `docs/P2_EVIDENCE_TEMPLATE.json` is intentionally all `PENDING`. Copy it to a private, gitignored operator path outside this repository and fill only aggregate evidence with a UTC observation time. Never commit credentials, emails, user names or raw provider identifiers. `node scripts/p2-closure-gate.mjs <private-file.json>` returns `BLOCKED` until all six external checks are freshly attested; the gate is an **operator evidence validation**, not an independent provider query.
+
+### P2-04 Cloudflare Queues and DLQ
+
+In the Cloudflare account dashboard, inspect Queues `msm-mail-provisioning` and `msm-mail-provisioning-dlq` for current queued/backlogged messages, consumer errors, retries and available throughput/age charts. Record each metric's exact name, observed value, units, UTC timestamp and whether it is unavailable, without recording message bodies. Queue messages can be consumed between snapshots, so a momentary depth of zero alone cannot certify retry handling. Mark P2-04 `PASS` only with meaningful coverage and no unexplained backlog, error spike or DLQ accumulation. D1 most recent dispatch/completion agreement is useful but NOT a substitute for Queues provider metrics.
+
+### P2-05 Cloudflare Free budgets
+
+Inspect the provider account plan and exact current limits before interpreting percentages, since provider allowances can change. Capture UTC current-day and monthly usage **with their real windows** for Worker requests, CPU time, D1 reads/writes/database storage, KV operations/storage, Queue operations/backlog and any billed features actually enabled. For each metric record whether the provider dashboard exposes a current value, source dashboard page and observation time. Use thresholds 50% watch, 80% warning, 95% critical, and 100% stop-and-investigate (for each confirmed cap). An unknown cap/usage must stay `UNKNOWN`, never green; do not enable billing automatically.
+
+### P2-06 P1 manual evidence ledger
+
+Review `docs/P1_PRODUCTION_ACCEPTANCE.md` and produce a private anonymized ledger for P1-08 through P1-14 containing: check identifier, tested feature, expected/observed behavior, tester role/device category, UTC timestamp and sanitized evidence reference. Separate CI assertions from actual operator test observations; don't fabricate device runs. Record failures as `PENDING` until corrected/rechecked; avoid message bodies, attachments, email addresses or auth credentials.
+
+### P2-07 safe release / rollback checklist
+
+Before any future promotion: verify `git status` is clean, intended Git commit, `npm test` / typecheck / build CI gates, current `npm run qa:p2:release:verify`, public health and active Worker Version ID with `npm run qa:p2:worker:active -- 94a7ed90-9478-4cc6-b339-97d6ca23d2b4` (replace with actual expected ID when changed). Verify bindings and existing `wrangler.toml` **locally** because these files may not be tracked in Git; don't print secret values. Record both Worker ID and release-manifest fingerprint before promotion.
+
+A real rollback is a privileged production change: document intended known-good Worker Version ID and use Cloudflare's deployment controls only with a separate explicit approval and verified backup; **do not execute rollback as part of read-only P2 certification**. After any authorized rollback, repeat health, route, inbound/outbound user validation under approved test quota, and active Worker Version ID checks. Prove rollback capability through a reviewable non-destructive procedure or an approved isolated rehearsal; mere documentation does not certify an executed rollback.
+
+### P2 closure gates
+
+`p2-01-bundle`: verifiable Worker bundle digest or equivalent build-to-deployment attestation (beyond published manifest + current Version ID). `p2-02-provider`: current Resend **account-wide** daily/monthly usage independently observed and reconciled with local reservations. `p2-04-queues`: provider Queue and DLQ metrics inspected. `p2-05-cloudflare`: Cloudflare Free plan limits and usage windows captured. `p2-06-manual`: anonymized manual P1 acceptance evidence completed. `p2-07-rollback`: approved non-destructive rollback readiness review completed.
+
+To avoid mixing partial and full assurance, the global P2 gate returns **BLOCKED** when any control is absent, stale (older than 24 hours), unverified, unknown, or missing a safe evidence description. This does not block ongoing mail operations; it blocks claiming final P2 certification.
+
 ## Hard safety conditions
 
 - A successful CI suite is not an authenticated production E2E certificate.
