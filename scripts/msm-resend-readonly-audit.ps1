@@ -122,6 +122,41 @@ try {
  }
 }catch{Write-Host "Webhook aggregate query unavailable" -ForegroundColor Yellow}
 Write-Host ""
+Write-Host "=== P2 WEBHOOK EVENT LINEAGE (READ-ONLY, AGGREGATED) ==="
+try {
+ $lineageSql="SELECT COUNT(*) AS delivery_rows,COALESCE(SUM(CASE WHEN e.provider_event_id IS NULL THEN 1 ELSE 0 END),0) AS orphan_deliveries,COALESCE(SUM(CASE WHEN d.status NOT IN ('pending','delivered') OR d.status IS NULL THEN 1 ELSE 0 END),0) AS unexpected_statuses,COALESCE(SUM(CASE WHEN d.status='pending' AND d.attempts>0 THEN 1 ELSE 0 END),0) AS pending_after_attempt,COALESCE(SUM(CASE WHEN d.status='pending' AND d.last_attempt_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 hour') THEN 1 ELSE 0 END),0) AS pending_stale_1h,COALESCE(SUM(CASE WHEN d.status='delivered' AND d.delivered_at IS NULL THEN 1 ELSE 0 END),0) AS delivered_without_timestamp,COUNT(DISTINCT CASE WHEN d.status='delivered' THEN d.provider_event_id END) AS distinct_forwarded_events FROM control_webhook_deliveries d JOIN control_installations i ON i.id=d.installation_id LEFT JOIN control_webhook_events e ON e.provider_account_id=d.provider_account_id AND e.provider_event_id=d.provider_event_id WHERE i.domain='$domainSafe';"
+ $lineageOut=& npx --no-install wrangler d1 execute msm-mail-control-db --config wrangler.control-plane.toml --remote --json --command $lineageSql 2>$null
+ if($LASTEXITCODE -ne 0){Write-Host "Webhook lineage counters unavailable" -ForegroundColor Yellow}
+ else {
+   $lineageJson=$lineageOut|Out-String|ConvertFrom-Json
+   $lineageRow=@(@($lineageJson)[0].results)[0]
+   if($null -eq $lineageRow -or $null -eq $lineageRow.delivery_rows){Write-Host "Webhook lineage counters not parseable" -ForegroundColor Yellow}
+   else{
+     Write-Host ("Delivery rows: {0} | Distinct forwarded events: {1}" -f $lineageRow.delivery_rows,$lineageRow.distinct_forwarded_events)
+     Write-Host ("Orphan deliveries: {0} | Unexpected states: {1} | Pending after attempts: {2} | Pending stale >1h: {3} | Forwarded without timestamp: {4}" -f $lineageRow.orphan_deliveries,$lineageRow.unexpected_statuses,$lineageRow.pending_after_attempt,$lineageRow.pending_stale_1h,$lineageRow.delivered_without_timestamp)
+     if([int]$lineageRow.orphan_deliveries -gt 0 -or [int]$lineageRow.unexpected_statuses -gt 0 -or [int]$lineageRow.pending_stale_1h -gt 0 -or [int]$lineageRow.delivered_without_timestamp -gt 0){
+       Write-Host "ALERT: webhook event lineage requires private operator investigation; no message contents shown." -ForegroundColor Yellow
+     }
+   }
+ }
+}catch{Write-Host "Webhook lineage remote audit unavailable" -ForegroundColor Yellow}
+try{
+ $duplicateSql="SELECT COUNT(*) AS duplicate_groups FROM (SELECT e.provider_account_id,e.provider_event_id FROM control_webhook_events e JOIN control_installations i ON i.provider_account_id=e.provider_account_id WHERE i.domain='$domainSafe' GROUP BY e.provider_account_id,e.provider_event_id HAVING COUNT(*)>1);"
+ $duplicateOut=& npx --no-install wrangler d1 execute msm-mail-control-db --config wrangler.control-plane.toml --remote --json --command $duplicateSql 2>$null
+ if($LASTEXITCODE -ne 0){Write-Host "Webhook duplicate event audit unavailable" -ForegroundColor Yellow}
+ else{
+   $duplicateJson=$duplicateOut|Out-String|ConvertFrom-Json
+   $duplicateRow=@(@($duplicateJson)[0].results)[0]
+   if($null -eq $duplicateRow -or $null -eq $duplicateRow.duplicate_groups){Write-Host "Webhook duplicate count unavailable" -ForegroundColor Yellow}
+   else{
+     Write-Host ("Duplicate provider event keys: {0}" -f $duplicateRow.duplicate_groups)
+     if([int]$duplicateRow.duplicate_groups -gt 0){Write-Host "ALERT: unexpected duplicate webhook event keys" -ForegroundColor Yellow}
+   }
+ }
+}catch{Write-Host "Webhook duplicate audit unavailable" -ForegroundColor Yellow}
+Write-Host "Webhook event-key dedup is checked against stored events only; repeat HTTP deliveries may be suppressed before storage."
+Write-Host "Delivery forwarded to Worker is NOT proof of recipient mail delivery."
+Write-Host ""
 Write-Host "=== P2 MAINTENANCE DISPATCH AND LOCK (READ-ONLY) ==="
 try{
  $dispatchSql="SELECT COUNT(*) AS dispatched_24h,MAX(m.scheduled_slot) AS last_dispatched_slot FROM control_maintenance_dispatches m JOIN control_installations i ON i.id=m.installation_id WHERE i.domain='$domainSafe' AND m.scheduled_slot>=strftime('%Y-%m-%dT%H:%M:%fZ','now','-24 hours');"
