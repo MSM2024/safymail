@@ -65,6 +65,16 @@
 - Current forwarding code accepts already seen events and retries pending deliveries; its data model records the final forwarding state, not every upstream HTTP retry. A `delivered` delivery means **forwarded to the target Worker** and must not be presented as provider-confirmed delivery to a mailbox.
 - The first real run determines whether event-to-delivery lineage is clean. Database read failures or missing fields are `UNKNOWN`, not a passing inspection. No secrets, event IDs, raw webhook JSON or recipients are printed.
 
+## P2-03 actual read-only D1 audit — 2026-11-05T19:07Z
+
+Operator reported domain `msmmystore.com` active/verified and Control Plane ready/active. Webhook counts: **0 pending**, **4 forwarded to Worker**, **0 retries**, maximum 1 attempt; lineage: **4 delivery rows**, **4 distinct forwarded events**, **0 orphan rows**, **0 unexpected states**, **0 stale pending**, **0 forwarded without timestamp**, and **0 duplicated stored event keys**. Thus P2-03 read-only **stored-event lineage PASS for this sample**. The data does not establish recipient delivery, observe all HTTP retry attempts, or validate future traffic. Resend local ledger: 3/day and 3/month (provider-account totals UNKNOWN).
+
+## P2-04 scheduler and queue — read-only evidence
+
+At 2026-11-05T19:07Z, the operator reported **66 dispatch rows** in 24h, last dispatched slot `2026-11-05T19:00:00.000Z`, mail Worker last completed slot `2026-11-05T19:00:00.000Z`, and no active maintenance lock. This is positive completion evidence for the most recent slot only. Older slots are not individually certified by this aggregate.
+
+The audit adds a separate read-only count of distinct scheduled slots in the prior 24 hours and age in minutes of the latest dispatch, with an alert if older than 30 minutes. Queue **pending messages, retries, DLQ depth and consumer execution histories** are explicitly UNKNOWN from D1 dispatch claims. Inspect `msm-mail-provisioning` and `msm-mail-provisioning-dlq` metrics in Cloudflare before declaring P2-04 fully certified. Do not generate test messages, replay, delete or drain queues during read-only certification.
+
 ## Hard safety conditions
 
 - A successful CI suite is not an authenticated production E2E certificate.
