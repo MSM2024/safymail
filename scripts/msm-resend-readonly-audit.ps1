@@ -92,11 +92,11 @@ try {
      Write-Host ("Today UTC: {0}/100 | Current month UTC: {1}/3000" -f $daily,$monthly)
      Write-Host ("Local observation UTC: {0}" -f ([DateTime]::UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ")))
      $quotaArgs=@("./scripts/p2-resend-quota-reconcile.mjs",("--local-daily="+$daily),("--local-monthly="+$monthly))
-     if($PSBoundParameters.ContainsKey("ProviderDaily")){$quotaArgs+=("--provider-daily="+$ProviderDaily.Value)}
-     if($PSBoundParameters.ContainsKey("ProviderMonthly")){$quotaArgs+=("--provider-monthly="+$ProviderMonthly.Value)}
+     if($PSBoundParameters.ContainsKey("ProviderDaily")){$quotaArgs+=("--provider-daily="+$ProviderDaily)}
+     if($PSBoundParameters.ContainsKey("ProviderMonthly")){$quotaArgs+=("--provider-monthly="+$ProviderMonthly)}
      if($ProviderObservedAtUtc -ne ""){$quotaArgs+=("--provider-observed-at="+$ProviderObservedAtUtc)}
      Write-Host "=== P2 ACCOUNT QUOTA RECONCILIATION (READ-ONLY) ==="
-     & node $quotaArgs
+     & node @quotaArgs
      if($LASTEXITCODE -ne 0){Write-Host "P2 quota reconciliation could not certify provider observation." -ForegroundColor Yellow}
      if($daily -ge 100 -or $monthly -ge 3000){Write-Host "ALERT: LOCAL QUOTA EXHAUSTED - do not send more tests." -ForegroundColor Red}
      elseif($daily -ge 80 -or $monthly -ge 2400){Write-Host "CAUTION: 80 percent local quota reached - reserve capacity for real mail." -ForegroundColor Yellow}
