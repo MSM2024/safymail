@@ -28,7 +28,7 @@ export async function diagnoseRelayConnectivity(env: Env): Promise<RelayConnecti
       ? env.CONTROL_PLANE_SERVICE.fetch.bind(env.CONTROL_PLANE_SERVICE)
       : fetch;
     const response = await transport(url.toString(), {
-      method: "GET", redirect: "error", signal: AbortSignal.timeout(5000)
+      method: "GET", redirect: "manual", signal: AbortSignal.timeout(5000)
     });
     const content = await response.json().catch(() => null) as {status?: string;service?: string} | null;
     return {
