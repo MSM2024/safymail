@@ -19,6 +19,7 @@ const drawings={
   aliases:'<path d="M7 17 17 7M8 7h9v9"/><path d="M4 12v7a1 1 0 0 0 1 1h7"/>',
   users:'<circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M16 7h5M18.5 4.5v5"/>',
   hostnames:'<rect x="3" y="3" width="18" height="7" rx="2"/><rect x="3" y="14" width="18" height="7" rx="2"/><path d="M7 7h.01M7 18h.01M16 10v4"/>',
+  'access-hosts':'<rect x="3" y="3" width="18" height="7" rx="2"/><rect x="3" y="14" width="18" height="7" rx="2"/><path d="M7 7h.01M7 18h.01M16 10v4"/>',
   audit:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   configuration:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1 1 0 0 0 .2 1.1l-1.2 2.1a1 1 0 0 0-1.1.4l-1.9-.4a7 7 0 0 1-2 .9l-.8 1.8h-2.4l-.8-1.8a7 7 0 0 1-2-.9l-1.9.4a1 1 0 0 0-1.1-.4l-1.2-2.1a1 1 0 0 0 .2-1.1L3 13a7 7 0 0 1 0-2l1.4-2a1 1 0 0 0-.2-1.1l1.2-2.1a1 1 0 0 0 1.1-.4l1.9.4a7 7 0 0 1 2-.9l.8-1.8h2.4l.8 1.8a7 7 0 0 1 2 .9l1.9-.4a1 1 0 0 0 1.1.4l1.2 2.1a1 1 0 0 0-.2 1.1l1.4 2a7 7 0 0 1 0 2Z"/>',
   menu:'<path d="M4 6h16M4 12h16M4 18h16"/>',
