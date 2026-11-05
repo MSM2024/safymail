@@ -33,6 +33,16 @@
 3. P2-01: prepare build/deploy provenance contract and a deterministic deployment checklist; execute deployment only with reviewed target and approval.
 4. P2-05 / P2-06 / P2-07: assess provider dashboards, evidence ledger, release/rollback gates.
 
+## P2-01 release evidence — 2026-11-05
+
+**Result: published manifest and Git-tree consistency PASS, runtime attestation pending.**
+
+- Deployment executed by operator to existing `msm-mail-preview`: Version ID `94a7ed90-9478-4cc6-b339-97d6ca23d2b4` (Cloudflare Wrangler CLI output, 2026-11-05T17:37Z). This version was recorded at publication time; the manifest alone cannot cryptographically prove the running Worker bundle.
+- `msm-release.json` published via custom domain and direct Workers.dev host; both canonical and controlled-query probes return HTTP 200, JSON `release-manifest`, and commit `6d1e513e065fb89e3aa2583832ae4774444416ff`. Diagnosis `both-serve-same-manifest`.
+- After PR #55 (`79b3d62e26d101d62799510021a777e48f1316cc`) the operator ran `npm run qa:p2:release:verify`: `manifest-match-windows-checkout`, status 200, localHead `79b3d62...`, publishedCommit `6d1e513...`. Indicates published SHA-256 of source and HTML matches the referenced Git blobs once their Windows checkout newline representation is taken into account; source and HTML comparisons PASS.
+- No assertion that `main` HEAD is deployed; the published release is intentionally an older commit. No new live sends or DNS changes were part of this verification.
+- **Remaining for strict P2-01 GO:** bind the recorded Worker Version ID to a machine-verifiable build/deployment attestation, including worker bundle digest, then test the verified runtime release. Status is **PARTIAL PASS**, not full cryptographic proof.
+
 ## Hard safety conditions
 
 - A successful CI suite is not an authenticated production E2E certificate.
