@@ -18,9 +18,10 @@ export function assessDeployPreflight(input){
   if(typeof input.gitStatus!=="string"||input.gitStatus.trim())
     return {result:"BLOCKED",reason:"tracked-worktree-dirty"};
   if(typeof input.config!=="string")return {result:"BLOCKED",reason:"wrangler-config-missing"};
-  const named=input.config.match(/^name\s*=\s*"([^"]+)"\s*(?:#.*)?$/m)?.[1];
+  const config=input.config.replace(/^\uFEFF/,"");
+  const named=config.match(/^[ \t]*name[ \t]*=[ \t]*"([^"\r\n]+)"[ \t]*(?:#[^\r\n]*)?\r?$/m)?.[1];
   if(named!==WORKER)return {result:"BLOCKED",reason:"wrong-worker-target"};
-  if(!/^(?:main\s*=|\[assets\])/m.test(input.config))
+  if(!/^[ \t]*(?:main[ \t]*=|\[assets\][ \t]*\r?$)/m.test(config))
     return {result:"BLOCKED",reason:"worker-source-or-assets-missing"};
   return {result:"READY-FOR-LOCAL-DRY-RUN",head:input.head,worker:WORKER,
     note:"No Cloudflare credential, remote bindings, production E2E, or active deployment has been checked."};
