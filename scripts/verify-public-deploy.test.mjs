@@ -57,3 +57,22 @@ test("classifies same-origin canonical 307 as redirect rather than failure", asy
 test("rejects redirects to other same-origin destinations", () => {
   assert.equal(classifyRedirect(new Response("",{status:307,headers:{Location:"/admin"}}), TARGET), "unexpected-redirect");
 });
+
+test("accepts canonical redirects preserving only the controlled probe query", async () => {
+  const request = TARGET + "index.html?msm_p1_probe=20261105";
+  const permitted = new Response("", {status:307,headers:{Location:"/?msm_p1_probe=20261105"}});
+  assert.equal(classifyRedirect(permitted,request), "canonical-redirect");
+  assert.equal(classifyRedirect(new Response("",{status:307,headers:{Location:"/"}}),request),"canonical-redirect");
+  assert.equal(classifyRedirect(new Response("",{status:307,headers:{Location:"/?msm_p1_probe=other"}}),request),"unexpected-redirect");
+  assert.equal(classifyRedirect(new Response("",{status:307,headers:{Location:"/?access_token=bad"}}),request),"unexpected-redirect");
+  assert.equal(classifyRedirect(permitted,TARGET + "index.html"),"unexpected-redirect");
+});
+
+test("reports redirect location for diagnosis without following redirects", async () => {
+  const results = await comparePublicShells(async (url) => {
+    if (url.includes("/index.html")) return new Response("",{status:307,headers:{Location:url.includes("?")?"/?msm_p1_probe=20261105":"/"}});
+    return new Response("<html>"+ EXPECTED +"</html>",{headers:{"Content-Type":"text/html"}});
+  });
+  assert.deepEqual(results.map(r=>r.result),["current","canonical-redirect","canonical-redirect"]);
+  assert.equal(results[2].redirectLocation,"/?msm_p1_probe=20261105");
+});

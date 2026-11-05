@@ -40,7 +40,12 @@ export function classifyRedirect(response, requestUrl) {
   try {
     const redirected = new URL(location, requestUrl);
     const expected = new URL(TARGET);
-    return redirected.origin === expected.origin && redirected.pathname === "/" && !redirected.search
+    const original = new URL(requestUrl);
+    // A canonical redirect may preserve or drop only the controlled test query.
+    const probeQuery = "?msm_p1_probe=20261105";
+    const allowedQuery = original.pathname === "/index.html" && original.search === probeQuery;
+    const safeQuery = redirected.search === "" || (allowedQuery && redirected.search === probeQuery);
+    return redirected.origin === expected.origin && redirected.pathname === "/" && !redirected.username && !redirected.password && !redirected.hash && safeQuery
       ? "canonical-redirect" : "unexpected-redirect";
   } catch {
     return "invalid-redirect";
@@ -67,6 +72,7 @@ export async function comparePublicShells(fetchFn = fetch) {
       cfCacheStatus: response.headers.get("cf-cache-status") || "not-reported",
       cacheControl: response.headers.get("cache-control") || "not-reported",
       age: response.headers.get("age") || "not-reported",
+      redirectLocation: redirected ? response.headers.get("location") || "not-reported" : undefined,
     });
   }
   return results;
