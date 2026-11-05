@@ -21,4 +21,7 @@ assert.ok(source.includes("control_maintenance_dispatches") && source.includes("
 assert.ok(source.includes("Delivered here means webhook forwarded to Worker"),"Do not conflate webhook forwarding with recipient email delivery");
 assert.ok(source.includes("A dispatch record does not prove maintenance completion"),"Scheduler audit must distinguish dispatch from completion");
 assert.ok(!/Write-Host[^\\r\\n]*(?:payload_json|lock_token|idempotency_key|provider_event_id)/i.test(source),"P2 audit must not print sensitive identifiers or payloads");
+assert.ok(source.includes("ProviderObservedAtUtc") && source.includes("ProviderDaily") && source.includes("ProviderMonthly"),"P2 provider observations must require paired counters and UTC evidence");
+assert.ok(source.includes("p2-resend-quota-reconcile.mjs") && source.includes("& node @quotaArgs"),"P2 PowerShell reconciliation must invoke pure Node helper");
+assert.ok(source.includes("account-wide quota remains UNKNOWN"),"P2 must not present unconfirmed provider headroom as safe");
 console.log("MSM Resend audit PowerShell 5.1 encoding and read-only guard PASS");

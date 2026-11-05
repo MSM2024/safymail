@@ -45,6 +45,17 @@
 - The audit emitted Node `DEP0190` because it launched `npx.cmd` with `shell:true` on Windows. The follow-up correction invokes the installed Wrangler JavaScript entrypoint using the running Node executable with `shell:false`; CI regression checks that no shell is invoked.
 - **Remaining for strict P2-01 GO:** bind the recorded Worker Version ID to a machine-verifiable build/deployment attestation, including worker bundle digest, then test the verified runtime release. Status is **PARTIAL PASS**, not full cryptographic proof.
 
+## P2-02 account quota reconciliation — operator procedure
+
+**Status: local D1 ledger observations supported; account-wide usage is UNKNOWN until independently observed.**
+
+- Read-only command without provider figures: `powershell -NoProfile -File scripts/msm-resend-readonly-audit.ps1`. This counts `reserved/sent/uncertain` by shared provider account for UTC day/month and never asserts external usage.
+- When Resend dashboard provides both account-wide UTC day and current-month counts, record their observation time in UTC and run `powershell -NoProfile -File scripts/msm-resend-readonly-audit.ps1 -ProviderDaily 8 -ProviderMonthly 25 -ProviderObservedAtUtc "2026-11-05T18:25:00Z"` (numbers **illustrative only**).
+- Timestamp must be fresh (at most 15 minutes), current UTC day, explicit `Z`; values must be nonnegative integers and supplied together. Stale or partial observations fail closed. Do not treat Resend dashboard figures with ambiguous/non-UTC windows as certified.
+- Dashboard gap = provider counter minus D1 reservation ledger count; gap can be negative because reserved/uncertain records count defensively. **A positive gap is not independently proof of external sends** and absence of a gap does not prove none occurred.
+- Conservative observed use = maximum of dashboard count and D1 reservation count in each period. Warning levels: watch 50%, warning 80%, critical 95%, exhausted 100% of 100/day or 3000/month. Unknown provider usage never reports account-wide remaining capacity.
+- Current D1 figures and provider dashboard observations can change; do not treat past output as current quota, guaranteed sending capacity, or real-time platform enforcement. No automated emails, billing changes, provider API credentials or production writes are involved.
+
 ## Hard safety conditions
 
 - A successful CI suite is not an authenticated production E2E certificate.
