@@ -22,7 +22,7 @@ export async function processMaintenanceBatch(env: MaintenanceJobEnv, installati
   const outcomes = await Promise.all(installations.map(async (installation, index) => {
     const token = tokens[index];
     const route = resolveMailWebhookRoute(installation.domain, env.MAIL_DELIVERY_DOMAIN, env.MAIL_DELIVERY_HOST);
-    const endpoint = new URL("/api/internal/maintenance", route.url);
+    const endpoint = new URL("/api/internal/maintenance", route.useBinding ? route.url : "https://" + installation.domain);
     const sender = route.useBinding && env.MAIL_DELIVERY_SERVICE
       ? env.MAIL_DELIVERY_SERVICE.fetch.bind(env.MAIL_DELIVERY_SERVICE)
       : fetch;
