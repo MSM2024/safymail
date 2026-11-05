@@ -1,3 +1,4 @@
+import { evaluateActivationReadiness } from "./activation-readiness";
 import { resolveMailWebhookRoute } from "./webhook-forwarding";
 import { isValidResendWebhookSecret } from "./webhook-secret-validation";
 import { Hono } from "hono";
@@ -222,6 +223,58 @@ app.get("/api/installations/:id", async c => {
   const checkpoints = await c.env.CONTROL_DB.prepare("SELECT step,status,details_json,idempotency_key,created_at FROM control_checkpoints WHERE installation_id=? ORDER BY created_at").bind(installationId).all();
   const job = await c.env.CONTROL_DB.prepare("SELECT job_id,expires_at,created_at FROM control_provisioning_jobs WHERE installation_id=?").bind(installationId).first();
   return c.json({ installation, checkpoints: checkpoints.results || [], job: job || null });
+});
+
+// Read-only activation preflight based on persisted evidence; no secrets are returned.
+app.get("/api/installations/:id/readiness", async c => {
+  const installationId = c.req.param("id");
+  if (!/^[a-f0-9-]{16,64}$/i.test(installationId)) return fail(c, 404, "installation_not_found");
+  const installation = await c.env.CONTROL_DB.prepare(
+    "SELECT i.id,i.status,i.current_step,i.domain,i.provider_account_id,a.status AS provider_status FROM control_installations i LEFT JOIN control_provider_accounts a ON a.id=i.provider_account_id WHERE i.id=?"
+  ).bind(installationId).first<{id:string;status:string;current_step:string;domain:string;provider_account_id:string|null;provider_status:string|null}>();
+  if (!installation) return fail(c,404,"installation_not_found");
+  const checkpoints = await c.env.CONTROL_DB.prepare(
+    "SELECT step FROM control_checkpoints WHERE installation_id=? AND status='completed'"
+  ).bind(installationId).all<{step:string}>();
+  const secret = await c.env.CONTROL_DB.prepare(
+    "SELECT 1 AS configured FROM control_secrets WHERE installation_id=? AND secret_name='RESEND_WEBHOOK_SECRET'"
+  ).bind(installationId).first();
+  const delivery = await c.env.CONTROL_DB.prepare(
+    "SELECT COUNT(*) AS total FROM control_webhook_deliveries WHERE installation_id=? AND status='delivered'"
+  ).bind(installationId).first<{total:number}>();
+  const readiness = evaluateActivationReadiness({
+    status:installation.status, currentStep:installation.current_step,
+    providerStatus:installation.provider_status,
+    completedSteps:(checkpoints.results || []).map(row=>row.step),
+    webhookSecretConfigured:Boolean(secret),
+    forwardedWebhookCount:Number(delivery?.total || 0)
+  });
+  return c.json({installationId,status:installation.status,...readiness});
+});
+
+// Explicit administrator action; transactional CAS prevents accidental status promotion.
+// A successfully processed signed provider webhook is mandatory.
+app.post("/api/installations/:id/activate", async c => {
+  const installationId = c.req.param("id");
+  if (!/^[a-f0-9-]{16,64}$/i.test(installationId)) return fail(c,404,"installation_not_found");
+  const raw = await c.req.text();
+  if (enc.encode(raw).byteLength>128) return fail(c,413,"payload_too_large");
+  let body:unknown;
+  try { body=JSON.parse(raw); } catch { return fail(c,400,"invalid_json"); }
+  if (!body || typeof body!=="object" || Array.isArray(body) ||
+      (body as {confirm?:unknown}).confirm!=="activate") return fail(c,400,"activation_confirmation_required");
+  const result = await c.env.CONTROL_DB.prepare(
+    `UPDATE control_installations SET status='ready',current_step='ready',updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
+     WHERE id=? AND status='configuring' AND current_step='resources_ready'
+       AND EXISTS (SELECT 1 FROM control_provider_accounts p WHERE p.id=control_installations.provider_account_id AND p.status='active')
+       AND (SELECT COUNT(DISTINCT step) FROM control_checkpoints WHERE installation_id=control_installations.id AND status='completed'
+         AND step IN ('cloudflare_verified','d1_ready','kv_ready','resend_domain_ready','resend_webhook_ready'))=5
+       AND EXISTS (SELECT 1 FROM control_secrets WHERE installation_id=control_installations.id AND secret_name='RESEND_WEBHOOK_SECRET')
+       AND EXISTS (SELECT 1 FROM control_webhook_deliveries WHERE installation_id=control_installations.id AND status='delivered')`
+  ).bind(installationId).run();
+  if ((result.meta.changes||0)!==1) return fail(c,409,"installation_readiness_incomplete_or_already_activated");
+  await audit(c.env.CONTROL_DB,installationId,"installation.activated","success",{evidence:"signed_webhook_forwarded_and_resources_ready"});
+  return c.json({installationId,status:"ready",maintenanceEligible:true});
 });
 
 app.post("/api/installations/:id/provision", async c => {
@@ -582,7 +635,7 @@ app.post("/webhooks/resend/:providerAccountId", async c => {
   ).bind(providerAccountId, eventId).first();
   if (!knownEvent) {
     const ready = await c.env.CONTROL_DB.prepare(
-      "SELECT id FROM control_installations WHERE provider_account_id=? AND status='ready'"
+      "SELECT i.id FROM control_installations i WHERE i.provider_account_id=? AND (i.status='ready' OR (i.status='configuring' AND i.current_step='resources_ready' AND (SELECT COUNT(DISTINCT step) FROM control_checkpoints WHERE installation_id=i.id AND status='completed' AND step IN ('cloudflare_verified','d1_ready','kv_ready','resend_domain_ready','resend_webhook_ready'))=5 AND EXISTS (SELECT 1 FROM control_secrets WHERE installation_id=i.id AND secret_name='RESEND_WEBHOOK_SECRET')))"
     ).bind(providerAccountId).all<{ id: string }>();
     const targets = ready.results || [];
     const statements = [
