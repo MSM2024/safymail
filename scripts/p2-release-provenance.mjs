@@ -102,7 +102,7 @@ async function main() {
       const historicalShell = gitFileAtCommit(publishedCommit, "public/index.html");
       result = compareRelease(remote, publishedCommit, historicalSource, historicalShell);
       if (result === "source-mismatch" || result === "shell-mismatch") {
-        const windowsText = (bytes) => Buffer.from(bytes.toString("utf8").replace(/\\r?\\n/g, "\\r\\n"));
+        const windowsText = (bytes) => Buffer.from(bytes.toString("utf8").replace(/\r?\n/g, "\r\n"));
         const attempts = [
           [windowsText(historicalSource), historicalShell],
           [historicalSource, windowsText(historicalShell)],
