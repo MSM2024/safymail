@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { sealCredentials, openCredentials, deriveMaintenanceToken } from "./provisioning-jobs";
+import { sealCredentials, openCredentials, deriveMaintenanceToken, sealSecret, openProvisioningSecret } from "./provisioning-jobs";
 
 const master = "vault-key-".repeat(5);
 const credentials = {
@@ -41,4 +41,18 @@ test("maintenance token is deterministic per installation and isolated across in
   assert.equal(first, repeat);
   assert.notEqual(first, other);
   assert.match(first, /^[A-Za-z0-9_-]{43}$/);
+});
+
+test("recovered webhook secret is encrypted and scoped independently to provider and installation", async () => {
+  const secret = "whsec_sensitive_example_for_recovery";
+  const provider = "provider-123:RESEND_WEBHOOK_SECRET";
+  const installation = "installation-123:RESEND_WEBHOOK_SECRET";
+  const shared = await sealSecret(master, secret, provider);
+  const scoped = await sealSecret(master, secret, installation);
+  assert.equal(JSON.stringify(shared).includes(secret), false);
+  assert.equal(JSON.stringify(scoped).includes(secret), false);
+  assert.notEqual(shared.nonce, scoped.nonce);
+  assert.equal(await openProvisioningSecret(master, shared.ciphertext, shared.nonce, provider), secret);
+  assert.equal(await openProvisioningSecret(master, scoped.ciphertext, scoped.nonce, installation), secret);
+  await assert.rejects(() => openProvisioningSecret(master, shared.ciphertext, shared.nonce, installation));
 });
