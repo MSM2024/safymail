@@ -75,6 +75,12 @@ At 2026-11-05T19:07Z, the operator reported **66 dispatch rows** in 24h, last di
 
 The audit adds a separate read-only count of distinct scheduled slots in the prior 24 hours and age in minutes of the latest dispatch, with an alert if older than 30 minutes. Queue **pending messages, retries, DLQ depth and consumer execution histories** are explicitly UNKNOWN from D1 dispatch claims. Inspect `msm-mail-provisioning` and `msm-mail-provisioning-dlq` metrics in Cloudflare before declaring P2-04 fully certified. Do not generate test messages, replay, delete or drain queues during read-only certification.
 
+## P2-04 supplemental operator evidence — 2026-11-05T19:11:17Z
+
+The second read-only audit reports **66 dispatch rows / 66 distinct slots in 24h**, **64 historical dispatches older than 30 minutes** (ordinary historical rows, NOT failures), latest dispatch `2026-11-05T19:00:00.000Z`, latest completed slot `2026-11-05T19:00:00.000Z`, no active maintenance lock, and latest dispatch age **11.5 minutes**. No observed duplicate slots in that interval. The data does not establish that scheduling operated for all preceding 24 hours or certify every historical completion.
+
+Added pure read-only latest-slot comparator `scripts/p2-maintenance-completion.mjs`: an observed healthy latest slot requires matching dispatch/completion slots, a recent timestamp (at most 30 minutes) and valid D1 lock state. Any mismatch, stale record, or unavailable data is flagged as alert/unknown; the report never equates a dispatch claim with queue execution. Cloudflare Queue pending counts, retry counts and DLQ depth remain external evidence.
+
 ## Hard safety conditions
 
 - A successful CI suite is not an authenticated production E2E certificate.

@@ -158,6 +158,9 @@ Write-Host "Webhook event-key dedup is checked against stored events only; repea
 Write-Host "Delivery forwarded to Worker is NOT proof of recipient mail delivery."
 Write-Host ""
 Write-Host "=== P2 MAINTENANCE DISPATCH AND LOCK (READ-ONLY) ==="
+$lastDispatchedSlot=""
+$lastCompletedSlot=""
+$lockFlag=-1
 try{
  $dispatchSql="SELECT COUNT(*) AS dispatched_24h,MAX(m.scheduled_slot) AS last_dispatched_slot FROM control_maintenance_dispatches m JOIN control_installations i ON i.id=m.installation_id WHERE i.domain='$domainSafe' AND m.scheduled_slot>=strftime('%Y-%m-%dT%H:%M:%fZ','now','-24 hours');"
  $dispatchOut=& npx --no-install wrangler d1 execute msm-mail-control-db --config wrangler.control-plane.toml --remote --json --command $dispatchSql 2>$null
@@ -166,7 +169,10 @@ try{
    $dispatchJson=$dispatchOut|Out-String|ConvertFrom-Json
    $dispatchRow=@(@($dispatchJson)[0].results)[0]
    if($null -eq $dispatchRow -or $null -eq $dispatchRow.dispatched_24h){Write-Host "Maintenance dispatch not parseable" -ForegroundColor Yellow}
-   else{Write-Host ("Dispatches last 24h: {0} | Last dispatched slot: {1}" -f $dispatchRow.dispatched_24h,$dispatchRow.last_dispatched_slot)}
+   else{
+     $lastDispatchedSlot=[string]$dispatchRow.last_dispatched_slot
+     Write-Host ("Dispatches last 24h: {0} | Last dispatched slot: {1}" -f $dispatchRow.dispatched_24h,$dispatchRow.last_dispatched_slot)
+   }
  }
 }catch{Write-Host "Maintenance dispatch unavailable" -ForegroundColor Yellow}
 try{
@@ -177,7 +183,11 @@ try{
    $lockJson=$lockOut|Out-String|ConvertFrom-Json
    $lockRow=@(@($lockJson)[0].results)[0]
    if($null -eq $lockRow){Write-Host "Mail maintenance lock not found" -ForegroundColor Yellow}
-   else{Write-Host ("Last completed slot: {0} | Lock active: {1}" -f $lockRow.last_completed_slot,$lockRow.lock_active)}
+   else{
+     $lastCompletedSlot=[string]$lockRow.last_completed_slot
+     $lockFlag=[int]$lockRow.lock_active
+     Write-Host ("Last completed slot: {0} | Lock active: {1}" -f $lockRow.last_completed_slot,$lockRow.lock_active)
+   }
  }
 }catch{Write-Host "Mail maintenance lock unavailable" -ForegroundColor Yellow}
 Write-Host ""
@@ -200,6 +210,9 @@ try {
    }
  }
 }catch{Write-Host "Scheduler lag query unavailable" -ForegroundColor Yellow}
+Write-Host "=== P2 LATEST SLOT COMPLETION (READ-ONLY) ==="
+& node ./scripts/p2-maintenance-completion.mjs $lastDispatchedSlot $lastCompletedSlot $lockFlag
+if($LASTEXITCODE -ne 0){Write-Host "P2 latest completion: ALERT or UNKNOWN; inspect slots and Cloudflare metrics." -ForegroundColor Yellow}
 Write-Host "Queue pending, retries and DLQ depth: UNKNOWN from D1 dispatch records; inspect Cloudflare Queues metrics privately."
 Write-Host "A dispatch record is an enqueue claim, not proof of queue delivery or task completion."
 Write-Host "A dispatch record does not prove maintenance completion; review both slots."
