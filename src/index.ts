@@ -444,7 +444,23 @@ app.patch("/api/messages/:id", async (c) => {
     }
   }
   values.push(id);
-  await c.env.DB.prepare(`UPDATE messages SET ${updates.join(", ")} WHERE id = ?`).bind(...values).run();
+  // Recheck permissions in the write itself so revoked access cannot race
+  // between the preliminary SELECT and UPDATE.
+  const userScopedWrite = ` AND EXISTS (
+    SELECT 1 FROM email_accounts ea
+    JOIN companies co ON co.id = ea.company_id AND co.status = 'active'
+    JOIN company_memberships cm ON cm.company_id = ea.company_id AND cm.user_id = ?
+    JOIN account_permissions ap ON ap.account_id = ea.id AND ap.user_id = ?
+      AND ap.permission = 'read_write'
+    WHERE ea.id = messages.account_id AND ea.status = 'active'
+      AND ea.company_id = ?
+  )`;
+  const writeSql = `UPDATE messages SET ${updates.join(", ")} WHERE id = ?`
+    + (user.isSuperadmin ? "" : userScopedWrite);
+  const writeValues = user.isSuperadmin
+    ? values : [...values, user.id, user.id, c.get("hostCompanyId")];
+  const changed = await c.env.DB.prepare(writeSql).bind(...writeValues).run();
+  if ((changed.meta.changes ?? 0) !== 1) return c.json({ error: "not_found" }, 404);
   return c.json({ id, updated: true });
 });
 
@@ -1508,8 +1524,15 @@ app.patch("/api/contacts/:id", async (c) => {
   if(body.notes!==undefined){if(typeof body.notes!=="string"||body.notes.length>2000)return c.json({error:"invalid_notes"},400);sets.push("notes=?");values.push(body.notes.trim()||null);}
   if(!sets.length)return c.json({error:"no_supported_changes"},400);
   values.push(id);
-  try{await c.env.DB.prepare("UPDATE contacts SET "+sets.join(", ")+" WHERE id=?").bind(...values).run();}
+  const guard = user.isSuperadmin ? "" : ` AND company_id=?
+    AND EXISTS(SELECT 1 FROM company_memberships
+      WHERE user_id=? AND company_id=contacts.company_id)`;
+  const writeValues = user.isSuperadmin
+    ? values : [...values,c.get("hostCompanyId"),user.id];
+  let changed;
+  try{changed=await c.env.DB.prepare("UPDATE contacts SET "+sets.join(", ")+" WHERE id=?"+guard).bind(...writeValues).run();}
   catch{return c.json({error:"contact_conflict"},409);}
+  if((changed.meta.changes??0)!==1)return c.json({error:"contact_not_found"},404);
   await c.env.DB.prepare("INSERT INTO audit_logs(id,actor_user_id,company_id,action,resource_type,resource_id) VALUES(?,?,?,'contact.updated','contact',?)")
     .bind(newId(),user.id,current.company_id,id).run();
   return c.json({id,updated:true});
