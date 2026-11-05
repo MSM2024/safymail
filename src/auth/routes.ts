@@ -1,3 +1,4 @@
+import { consumeMfaRecoveryCode } from "./recovery";
 import { Hono } from "hono";
 import type { Env, AppVariables } from "../types";
 import { createSession, hashPassword, revokeSession, verifyPassword } from "../middleware/auth";
@@ -139,19 +140,10 @@ auth.post("/mfa/verify", async c => {
   } else if(/^[A-Fa-f0-9]{16}$/.test(code.replace(/[-\s]/g,""))){
     const backupHash=await hashBackupCode(code);
     const now=new Date().toISOString();
-    // D1.batch is transactional: consume a recovery code only while its
-    // challenge remains live, then consume that exact challenge in the
-    // same transaction. Two competing requests cannot spend one code twice.
-    const actions=await c.env.DB.batch([
-      c.env.DB.prepare(`UPDATE auth_backup_codes SET used_at=?
-        WHERE user_id=? AND code_hash=? AND used_at IS NULL
-        AND EXISTS (SELECT 1 FROM auth_mfa_challenges WHERE id=? AND token_hash=? AND expires_at>? AND attempts<5)`)
-        .bind(now,challenge.user_id,backupHash,challenge.id,tokenHash,now),
-      c.env.DB.prepare(`DELETE FROM auth_mfa_challenges WHERE id=? AND token_hash=? AND expires_at>?
-        AND EXISTS (SELECT 1 FROM auth_backup_codes WHERE user_id=? AND code_hash=? AND used_at=?)`)
-        .bind(challenge.id,tokenHash,now,challenge.user_id,backupHash,now)
-    ]);
-    valid=(actions[0]?.meta.changes??0)===1 && (actions[1]?.meta.changes??0)===1;
+    valid=await consumeMfaRecoveryCode(c.env.DB,{
+      userId:challenge.user_id,codeHash:backupHash,
+      challengeId:challenge.id,tokenHash,now
+    });
     challengeConsumed=valid;
     usedBackupCode=valid;
   }
