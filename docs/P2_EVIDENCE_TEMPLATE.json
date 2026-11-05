@@ -1,0 +1,47 @@
+{
+  "schema": "msm-mail-p2-evidence-v1",
+  "controls": [
+    {
+      "id": "p2-01-bundle",
+      "result": "PENDING",
+      "operatorVerified": false,
+      "observedAtUtc": "",
+      "evidence": ""
+    },
+    {
+      "id": "p2-02-provider",
+      "result": "PENDING",
+      "operatorVerified": false,
+      "observedAtUtc": "",
+      "evidence": ""
+    },
+    {
+      "id": "p2-04-queues",
+      "result": "PENDING",
+      "operatorVerified": false,
+      "observedAtUtc": "",
+      "evidence": ""
+    },
+    {
+      "id": "p2-05-cloudflare",
+      "result": "PENDING",
+      "operatorVerified": false,
+      "observedAtUtc": "",
+      "evidence": ""
+    },
+    {
+      "id": "p2-06-manual",
+      "result": "PENDING",
+      "operatorVerified": false,
+      "observedAtUtc": "",
+      "evidence": ""
+    },
+    {
+      "id": "p2-07-rollback",
+      "result": "PENDING",
+      "operatorVerified": false,
+      "observedAtUtc": "",
+      "evidence": ""
+    }
+  ]
+}
