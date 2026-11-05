@@ -180,5 +180,27 @@ try{
    else{Write-Host ("Last completed slot: {0} | Lock active: {1}" -f $lockRow.last_completed_slot,$lockRow.lock_active)}
  }
 }catch{Write-Host "Mail maintenance lock unavailable" -ForegroundColor Yellow}
+Write-Host ""
+Write-Host "=== P2 SCHEDULER LAG AND COMPLETION EVIDENCE (READ-ONLY) ==="
+try {
+ $lagSql="SELECT COUNT(*) AS dispatch_rows_24h,COUNT(DISTINCT m.scheduled_slot) AS distinct_slots_24h,COALESCE(SUM(CASE WHEN m.scheduled_slot < strftime('%Y-%m-%dT%H:%M:%fZ','now','-30 minutes') THEN 1 ELSE 0 END),0) AS historical_dispatches_30m,ROUND((julianday('now')-julianday(MAX(m.scheduled_slot)))*1440,1) AS newest_dispatch_age_minutes FROM control_maintenance_dispatches m JOIN control_installations i ON i.id=m.installation_id WHERE i.domain='$domainSafe' AND m.scheduled_slot>=strftime('%Y-%m-%dT%H:%M:%fZ','now','-24 hours');"
+ $lagOut=& npx --no-install wrangler d1 execute msm-mail-control-db --config wrangler.control-plane.toml --remote --json --command $lagSql 2>$null
+ if($LASTEXITCODE -ne 0){Write-Host "Scheduler lag query unavailable" -ForegroundColor Yellow}
+ else {
+   $lagJson=$lagOut|Out-String|ConvertFrom-Json
+   $lagRow=@(@($lagJson)[0].results)[0]
+   if($null -eq $lagRow -or $null -eq $lagRow.dispatch_rows_24h){Write-Host "Scheduler lag not parseable" -ForegroundColor Yellow}
+   else {
+     Write-Host ("Dispatch rows 24h: {0} | Distinct slots 24h: {1} | Historical dispatches >30m: {2}" -f $lagRow.dispatch_rows_24h,$lagRow.distinct_slots_24h,$lagRow.historical_dispatches_30m)
+     if($null -eq $lagRow.newest_dispatch_age_minutes){Write-Host "Last dispatch age: UNKNOWN (no dispatch in 24h)" -ForegroundColor Yellow}
+     else{
+       Write-Host ("Last dispatch age: {0} minutes" -f $lagRow.newest_dispatch_age_minutes)
+       if([double]$lagRow.newest_dispatch_age_minutes -gt 30){Write-Host "ALERT: most recent maintenance dispatch is older than 30 minutes." -ForegroundColor Yellow}
+     }
+   }
+ }
+}catch{Write-Host "Scheduler lag query unavailable" -ForegroundColor Yellow}
+Write-Host "Queue pending, retries and DLQ depth: UNKNOWN from D1 dispatch records; inspect Cloudflare Queues metrics privately."
+Write-Host "A dispatch record is an enqueue claim, not proof of queue delivery or task completion."
 Write-Host "A dispatch record does not prove maintenance completion; review both slots."
 Write-Host "AUDIT COMPLETE - No changes or email sends were performed." -ForegroundColor Green
