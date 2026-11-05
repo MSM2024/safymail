@@ -5,11 +5,16 @@ import {fileURLToPath,pathToFileURL} from "node:url";
 
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),"..");
 export const WORKER="msm-mail-preview";
+export const APPROVED_REPO="https://github.com/MSM2024/safymail.git";
+export function isApprovedRemote(url){
+ return typeof url==="string" && /^(?:https:\/\/github\.com\/MSM2024\/safymail(?:\.git)?|git@github\.com:MSM2024\/safymail\.git)$/.test(url.trim());
+}
 export function assessDeployPreflight(input){
   if(!input||typeof input!=="object")return {result:"BLOCKED",reason:"missing-input"};
+  if(!isApprovedRemote(input.remoteUrl))return {result:"BLOCKED",reason:"unexpected-release-remote"};
   if(input.branch!=="main")return {result:"BLOCKED",reason:"not-main-branch"};
-  if(!/^[0-9a-f]{40}$/.test(input.head)||input.head!==input.originMain)
-    return {result:"BLOCKED",reason:"not-synchronized-with-origin-main"};
+  if(!/^[0-9a-f]{40}$/.test(input.head)||input.head!==input.releaseMain)
+    return {result:"BLOCKED",reason:"not-synchronized-with-approved-release-main"};
   if(typeof input.gitStatus!=="string"||input.gitStatus.trim())
     return {result:"BLOCKED",reason:"tracked-worktree-dirty"};
   if(typeof input.config!=="string")return {result:"BLOCKED",reason:"wrangler-config-missing"};
@@ -25,12 +30,18 @@ function git(args){
   maxBuffer:1024*1024,stdio:["ignore","pipe","pipe"]}).trim();
 }
 export function localPreflight(){
+ const remote=process.env.MSM_RELEASE_REMOTE||"msm";
+ if(!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,40}$/.test(remote))return {result:"BLOCKED",reason:"invalid-release-remote-name"};
+ let remoteUrl;
+ try{remoteUrl=git(["remote","get-url",remote]);}catch{return {result:"BLOCKED",reason:"release-remote-unconfigured"};}
+ if(!isApprovedRemote(remoteUrl))return {result:"BLOCKED",reason:"unexpected-release-remote"};
  const configPath=path.join(ROOT,"wrangler.toml");
  if(!existsSync(configPath))return {result:"BLOCKED",reason:"wrangler-config-missing"};
  return assessDeployPreflight({
    branch:git(["branch","--show-current"]),
    head:git(["rev-parse","HEAD"]),
-   originMain:git(["rev-parse","origin/main"]),
+   releaseMain:git(["rev-parse","refs/remotes/"+remote+"/main"]),
+   remoteUrl,
    gitStatus:git(["status","--porcelain","--untracked-files=no"]),
    config:readFileSync(configPath,"utf8")
  });
