@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { makeManifest, validateManifest, readPublishedRelease, compareRelease, gitFileAtCommit, TARGET } from "./p2-release-provenance.mjs";
+import { makeManifest, validateManifest, readPublishedRelease, compareRelease, compareHistoricalRelease, gitFileAtCommit, TARGET } from "./p2-release-provenance.mjs";
 
 const sha = "a".repeat(40);
 const manifest = makeManifest(sha, Buffer.from("worker"), Buffer.from("shell"), "2026-11-05T12:00:00.000Z");
