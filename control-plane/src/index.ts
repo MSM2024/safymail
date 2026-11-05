@@ -520,7 +520,7 @@ app.post("/internal/installations/:id/resend/send", async c => {
     if(rec.status==="sent"&&rec.provider_message_id)return c.json({id:rec.provider_message_id,reused:true});
   }
   try{
-    const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{Authorization:"Bearer "+credentials.resendApiKey,"Content-Type":"application/json","Idempotency-Key":key},body:JSON.stringify(payload),redirect:"error"});
+    const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{Authorization:"Bearer "+credentials.resendApiKey,"Content-Type":"application/json","Idempotency-Key":key},body:JSON.stringify(payload),redirect:"manual"});
     const result=await response.json().catch(()=>({} as any)) as {id?:string;data?:{id?:string}};
     const providerId=result.id||result.data?.id;
     if(response.ok&&providerId){
