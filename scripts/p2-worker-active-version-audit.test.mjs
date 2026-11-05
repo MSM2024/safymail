@@ -55,7 +55,7 @@ test("Wrangler fallback only reads deployment listing with safe fixed arguments"
   });
   assert.equal(out.result,"expected-version-at-100-percent");
   assert.equal(seen.cmd,process.execPath);
-  assert.match(seen.args[0],/wrangler[\\/]bin[\\/]wrangler\\.js$/);
+  assert.equal(seen.args[0].replaceAll("\\","/").endsWith("/wrangler/bin/wrangler.js"),true);
   assert.deepEqual(seen.args.slice(1),["deployments","list","--config","wrangler.toml"]);
   assert.equal(seen.options.shell,false);
   assert.equal(seen.options.windowsHide,true);
