@@ -307,10 +307,10 @@ app.get("/api/messages", async (c) => {
             subject, substr(text_body, 1, 180) AS preview, is_read, is_starred, is_important, received_at, sent_at, delivery_status,
             COALESCE(received_at, sent_at, created_at) AS sort_at
      FROM messages
-     WHERE account_id = ? AND folder = ?
-       AND ((? = 'spam' AND spam_reasons_json LIKE '%legacy_mailu_junk%')
-         OR (? = 'trash' AND spam_reasons_json NOT LIKE '%legacy_mailu_junk%')
-         OR (? NOT IN ('spam','trash')))
+     WHERE account_id = ?
+       AND ((? = 'spam' AND (folder = 'spam' OR (folder = 'trash' AND spam_reasons_json LIKE '%legacy_mailu_junk%')))
+         OR (? = 'trash' AND folder = 'trash' AND spam_reasons_json NOT LIKE '%legacy_mailu_junk%')
+         OR (? NOT IN ('spam','trash') AND folder = ?))
        AND (? = '' OR subject LIKE ? OR from_address LIKE ? OR to_addresses LIKE ?)
        AND (? != 'unread' OR is_read = 0)
        AND (? != 'starred' OR is_starred = 1)
@@ -319,7 +319,7 @@ app.get("/api/messages", async (c) => {
          OR (COALESCE(received_at, sent_at, created_at) = ? AND id < ?))
      ORDER BY COALESCE(received_at, sent_at, created_at) DESC, id DESC
      LIMIT ?`
-  ).bind(accountId, folder === "spam" ? "trash" : folder, folder, folder, folder, query, "%"+query+"%", "%"+query+"%", "%"+query+"%",
+  ).bind(accountId, folder, folder, folder, folder, query, "%"+query+"%", "%"+query+"%", "%"+query+"%",
     filter, filter, filter, cursorDate, cursorDate, cursorDate, cursorId, limit).all();
 
   const last = rows.results.length ? rows.results[rows.results.length - 1] as any : null;
@@ -434,14 +434,10 @@ app.patch("/api/messages/:id", async (c) => {
   if (typeof body.is_important === "boolean") { updates.push("is_important = ?"); values.push(body.is_important ? 1 : 0); }
   if (typeof body.folder === "string" && allowedMoveFolders.includes(body.folder)) {
     updates.push("folder = ?");
-    values.push(body.folder === "spam" ? "trash" : body.folder);
-    if (body.folder === "spam") {
-      updates.push("spam_reasons_json = ?");
-      values.push('["legacy_mailu_junk"]');
-      updates.push("spam_score = 10");
-    } else {
-      updates.push("spam_reasons_json = CASE WHEN spam_reasons_json LIKE '%legacy_mailu_junk%' THEN '[]' ELSE spam_reasons_json END");
-    }
+    values.push(body.folder);
+    // Legacy Mailu junk stored in trash is still readable as Spam, but
+    // all newly moved Spam messages live in their own native folder.
+    updates.push("spam_reasons_json = CASE WHEN spam_reasons_json LIKE '%legacy_mailu_junk%' THEN '[]' ELSE spam_reasons_json END");
   }
   values.push(id);
   // Recheck permissions in the write itself so revoked access cannot race
