@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
@@ -50,6 +51,39 @@ export async function readCloudflareDeployment(accountId, token, fetchFn = fetch
   return data.result;
 }
 
+export function classifyWranglerOutput(output, expectedVersion) {
+  if (!UUID.test(expectedVersion)) throw Error("Invalid expected Cloudflare Worker version ID");
+  if (typeof output !== "string") throw Error("Wrangler output must be text");
+  // Wrangler 4.x lists repeated deployment blocks with Created/Version(s).
+  // Never infer the active version from a list of uploaded, inactive versions.
+  const blocks=output.split(/(?=^Created:\\s+\\d{4}-\\d{2}-\\d{2}T)/m);
+  const parsed=[];
+  for (const block of blocks) {
+    const date=/^Created:\\s+(\\d{4}-\\d{2}-\\d{2}T[^\\r\\n]+)/m.exec(block)?.[1]?.trim();
+    if (!date || Number.isNaN(Date.parse(date))) continue;
+    const versions=[];
+    const pattern=/\\(\\s*(\\d+(?:\\.\\d+)?)%\\s*\\)\\s+([a-f0-9-]{36})/gi;
+    for (const match of block.matchAll(pattern)) {
+      if (UUID.test(match[2])) versions.push({version_id:match[2],percentage:Number(match[1])});
+    }
+    parsed.push({created_on:date,versions});
+  }
+  if (!parsed.length) return {result:"unreadable-deployments"};
+  return classifyDeployments(parsed,expectedVersion);
+}
+
+export function readWranglerDeployment(expectedVersion, run = spawnSync) {
+  if (!UUID.test(expectedVersion)) throw Error("Invalid expected Cloudflare Worker version ID");
+  const command=process.platform==="win32"?"npx.cmd":"npx";
+  const args=["--no-install","wrangler","deployments","list","--config","wrangler.toml"];
+  const outcome=run(command,args,{
+    cwd:ROOT,encoding:"utf8",timeout:30000,maxBuffer:2*1024*1024,
+    shell:process.platform==="win32",windowsHide:true
+  });
+  if(outcome.error || outcome.status!==0) throw Error("Wrangler read-only deployment listing unavailable");
+  return classifyWranglerOutput(outcome.stdout,expectedVersion);
+}
+
 async function main() {
   const expected=process.argv[2];
   if(!expected || !UUID.test(expected)) {
@@ -57,13 +91,12 @@ async function main() {
     process.exitCode=2;return;
   }
   const token=process.env.CLOUDFLARE_API_TOKEN;
-  if(!token) {
-    console.error("P2-01 BLOCKED: set CLOUDFLARE_API_TOKEN in your private terminal; never share or print it.");
-    process.exitCode=2;return;
-  }
-  const account=extractAccountId(readFileSync(path.join(ROOT,"wrangler.toml"),"utf8"));
-  const deployments=await readCloudflareDeployment(account,token);
-  const result=classifyDeployments(deployments,expected);
+  const config=readFileSync(path.join(ROOT,"wrangler.toml"),"utf8");
+  const account=extractAccountId(config);
+  const result=token
+    ? classifyDeployments(await readCloudflareDeployment(account,token),expected)
+    : readWranglerDeployment(expected);
+  console.log("P2 WORKER AUDIT METHOD: "+(token?"cloudflare-api":"wrangler-existing-login"));
   console.log("P2 WORKER ACTIVE VERSION: "+JSON.stringify({worker:SCRIPT,expectedVersion:expected,...result}));
   console.log("Read-only Cloudflare deployment query; no Worker, Resend, DNS, D1 or credentials modified.");
   if(result.result!=="expected-version-at-100-percent") {
