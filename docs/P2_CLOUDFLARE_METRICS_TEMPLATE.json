@@ -1,0 +1,149 @@
+{
+  "schema": "msm-mail-cloudflare-metrics-v1",
+  "metrics": [
+    {
+      "id": "queue-primary-backlog",
+      "availability": "unavailable",
+      "value": null,
+      "limit": null,
+      "unit": null,
+      "windowStartUtc": "",
+      "windowEndUtc": "",
+      "observedAtUtc": "",
+      "operatorVerified": false,
+      "source": ""
+    },
+    {
+      "id": "queue-primary-retries",
+      "availability": "unavailable",
+      "value": null,
+      "limit": null,
+      "unit": null,
+      "windowStartUtc": "",
+      "windowEndUtc": "",
+      "observedAtUtc": "",
+      "operatorVerified": false,
+      "source": ""
+    },
+    {
+      "id": "queue-primary-consumer-errors",
+      "availability": "unavailable",
+      "value": null,
+      "limit": null,
+      "unit": null,
+      "windowStartUtc": "",
+      "windowEndUtc": "",
+      "observedAtUtc": "",
+      "operatorVerified": false,
+      "source": ""
+    },
+    {
+      "id": "queue-dlq-backlog",
+      "availability": "unavailable",
+      "value": null,
+      "limit": null,
+      "unit": null,
+      "windowStartUtc": "",
+      "windowEndUtc": "",
+      "observedAtUtc": "",
+      "operatorVerified": false,
+      "source": ""
+    },
+    {
+      "id": "worker-requests",
+      "availability": "unavailable",
+      "value": null,
+      "limit": null,
+      "unit": null,
+      "windowStartUtc": "",
+      "windowEndUtc": "",
+      "observedAtUtc": "",
+      "operatorVerified": false,
+      "source": ""
+    },
+    {
+      "id": "worker-cpu",
+      "availability": "unavailable",
+      "value": null,
+      "limit": null,
+      "unit": null,
+      "windowStartUtc": "",
+      "windowEndUtc": "",
+      "observedAtUtc": "",
+      "operatorVerified": false,
+      "source": ""
+    },
+    {
+      "id": "d1-reads",
+      "availability": "unavailable",
+      "value": null,
+      "limit": null,
+      "unit": null,
+      "windowStartUtc": "",
+      "windowEndUtc": "",
+      "observedAtUtc": "",
+      "operatorVerified": false,
+      "source": ""
+    },
+    {
+      "id": "d1-writes",
+      "availability": "unavailable",
+      "value": null,
+      "limit": null,
+      "unit": null,
+      "windowStartUtc": "",
+      "windowEndUtc": "",
+      "observedAtUtc": "",
+      "operatorVerified": false,
+      "source": ""
+    },
+    {
+      "id": "d1-storage",
+      "availability": "unavailable",
+      "value": null,
+      "limit": null,
+      "unit": null,
+      "windowStartUtc": "",
+      "windowEndUtc": "",
+      "observedAtUtc": "",
+      "operatorVerified": false,
+      "source": ""
+    },
+    {
+      "id": "kv-operations",
+      "availability": "unavailable",
+      "value": null,
+      "limit": null,
+      "unit": null,
+      "windowStartUtc": "",
+      "windowEndUtc": "",
+      "observedAtUtc": "",
+      "operatorVerified": false,
+      "source": ""
+    },
+    {
+      "id": "kv-storage",
+      "availability": "unavailable",
+      "value": null,
+      "limit": null,
+      "unit": null,
+      "windowStartUtc": "",
+      "windowEndUtc": "",
+      "observedAtUtc": "",
+      "operatorVerified": false,
+      "source": ""
+    },
+    {
+      "id": "queue-operations",
+      "availability": "unavailable",
+      "value": null,
+      "limit": null,
+      "unit": null,
+      "windowStartUtc": "",
+      "windowEndUtc": "",
+      "observedAtUtc": "",
+      "operatorVerified": false,
+      "source": ""
+    }
+  ]
+}

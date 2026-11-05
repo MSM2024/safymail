@@ -115,6 +115,20 @@ To avoid mixing partial and full assurance, the global P2 gate returns **BLOCKED
 - `npm run qa:p2:release:preflight -- 94a7ed90-9478-4cc6-b339-97d6ca23d2b4` is a *read-only* metadata preflight. It verifies a clean tracked worktree, published release-manifest consistency and authenticated active Cloudflare Worker version (100% traffic) through existing scripts. It neither deploys nor rolls back. Output `PASS-METADATA-ONLY` explicitly does **not** certify a running bundle digest, production E2E or a successful rollback rehearsal. The expected ID is an observation from 2026-11-05; replace it whenever an authorized deployment changes.
 - The global P2 evidence gate remains separately **BLOCKED** until provider account usage, Cloudflare Queues/DLQ, resource budgets, human test ledger, bundle attestation and rollback readiness are independently verified. Do not mark an unknown field as PASS.
 
+## P2-04 and P2-05 — structured Cloudflare provider evidence
+
+New files: `docs/P2_CLOUDFLARE_METRICS_TEMPLATE.json` and `scripts/p2-cloudflare-metrics.mjs`. Keep the completed file **outside Git** in a private location and run:
+
+```powershell
+npm run qa:p2:cloudflare:metrics -- "C:\\private\\p2-cloudflare-metrics.json"
+```
+
+Collect the dashboard observations for primary queue backlog/retries/consumer errors, DLQ backlog, Worker requests/CPU, D1 reads/writes/storage, KV operations/storage and Queue operations. Match each reading to its **actual provider time window and unit**, current UTC observation timestamp, dashboard source, and the **confirmed** plan-specific limit where one exists. Do not fabricate limits. Unavailable observations remain `unavailable`. Record only aggregates, never raw queue messages, email recipients or payloads.
+
+The validator rejects stale observations (over one hour), future timestamps, missing metrics, unknown budget limits and recorded queue anomalies. Budget thresholds are watch 50%, warning 80%, critical 95% and exhausted 100% **only when provider account caps have been verified**. Queue backlog/error/retry/DLQ metrics are checked for nonzero values separately; they are not treated as quota percentages. Even `METRICS-OBSERVED` certifies a timestamped observation set, **not** a live Queue execution history, successful retry handling, a tested rollback, the current provider plan or overall P2 GO.
+
+**Current status:** provider-specific evidence is still `UNKNOWN`. The earlier operator audit establishes latest D1 scheduler slot completion only. Do not convert its 67 dispatches into Cloudflare queue consumption numbers.
+
 ## Hard safety conditions
 
 - A successful CI suite is not an authenticated production E2E certificate.
