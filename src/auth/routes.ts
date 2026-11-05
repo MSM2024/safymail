@@ -1,3 +1,4 @@
+import { consumeMfaRecoveryCode } from "./recovery";
 import { Hono } from "hono";
 import type { Env, AppVariables } from "../types";
 import { createSession, hashPassword, revokeSession, verifyPassword } from "../middleware/auth";
@@ -125,6 +126,7 @@ auth.post("/mfa/verify", async c => {
   const body=await c.req.json<{code?:string}>().catch(()=>({} as any)), code=typeof body.code==="string"?body.code.trim():"";
   let valid=false;
   let usedBackupCode=false;
+  let challengeConsumed=false;
   if(/^\d{6}$/.test(code)){
     try {
       const secret=await decryptTotpSecret(challenge.totp_secret_ciphertext||"",c.env.TOTP_ENCRYPTION_KEY);
@@ -137,18 +139,23 @@ auth.post("/mfa/verify", async c => {
     } catch { return c.json({error:"mfa_unavailable"},503); }
   } else if(/^[A-Fa-f0-9]{16}$/.test(code.replace(/[-\s]/g,""))){
     const backupHash=await hashBackupCode(code);
-    const used=await c.env.DB.prepare("UPDATE auth_backup_codes SET used_at=? WHERE user_id=? AND code_hash=? AND used_at IS NULL")
-      .bind(new Date().toISOString(),challenge.user_id,backupHash).run();
-    valid=(used.meta.changes??0)===1;
+    const now=new Date().toISOString();
+    valid=await consumeMfaRecoveryCode(c.env.DB,{
+      userId:challenge.user_id,codeHash:backupHash,
+      challengeId:challenge.id,tokenHash,now
+    });
+    challengeConsumed=valid;
     usedBackupCode=valid;
   }
   if(!valid){
-    await c.env.DB.prepare("UPDATE auth_mfa_challenges SET attempts=attempts+1 WHERE id=?").bind(challenge.id).run();
+    await c.env.DB.prepare("UPDATE auth_mfa_challenges SET attempts=attempts+1 WHERE id=? AND attempts<5").bind(challenge.id).run();
     return c.json({error:"invalid_mfa_code"},401);
   }
-  const consumed=await c.env.DB.prepare("DELETE FROM auth_mfa_challenges WHERE id=? AND token_hash=? AND expires_at>?")
-    .bind(challenge.id,tokenHash,new Date().toISOString()).run();
-  if((consumed.meta.changes??0)!==1)return c.json({error:"mfa_challenge_expired"},401);
+  if(!challengeConsumed){
+    const consumed=await c.env.DB.prepare("DELETE FROM auth_mfa_challenges WHERE id=? AND token_hash=? AND expires_at>?")
+      .bind(challenge.id,tokenHash,new Date().toISOString()).run();
+    if((consumed.meta.changes??0)!==1)return c.json({error:"mfa_challenge_expired"},401);
+  }
   c.header("Set-Cookie",MFA_COOKIE+"=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict");
   await createSession(c,challenge.user_id,true);
   if(usedBackupCode)await c.env.DB.prepare("INSERT INTO audit_logs(id,actor_user_id,action,resource_type,resource_id) VALUES(?,?,'auth.backup_code_used','user',?)")
