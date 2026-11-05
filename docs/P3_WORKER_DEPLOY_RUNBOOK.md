@@ -4,20 +4,32 @@ Date: 2026-11-05. Target existing Worker **msm-mail-preview**, custom domain `ma
 
 ## 1. Operator commands: safe gates, then explicit deploy
 
-Run in `C:\Users\cm8ms\tet\msm-mail`, PowerShell, on `main` after closing the PR. Stop immediately on any nonzero exit status.
+**Corrección tras prueba del operador (2026-11-05):** este repositorio NO contiene `package-lock.json`, por lo que `npm ci` da `EUSAGE` y no demuestra un fallo de la aplicación. Usa `npm install --no-package-lock` para instalar las versiones permitidas por `package.json` sin crear un lockfile local. Este método es **menos reproducible** que una instalación bloqueada; la tarea futura es incorporar un lockfile versionado y sustituirlo por `npm ci`. No ejecutes deploy si algún gate falla: PowerShell no cancela automáticamente una lista de comandos después de un error de npm.
+
+El registro enviado termina durante la lista de pruebas (en `Spam list includes`); **no consta allí el resultado final del test**, typecheck, validadores, dry-run ni publicación.
+
+Run in `C:\Users\cm8ms\tet\msm-mail`, PowerShell, on `main` after closing the PR. Stop immediately on any nonzero exit status; check `$LASTEXITCODE` after each executable, including Wrangler.
 
 ```powershell
 git fetch origin
 git switch main
 git pull --ff-only origin main
-npm ci
+npm install --no-package-lock
+if ($LASTEXITCODE -ne 0) { throw "Instalación de dependencias fallida" }
 npm test
+if ($LASTEXITCODE -ne 0) { throw "Tests fallidos" }
 npm run typecheck
+if ($LASTEXITCODE -ne 0) { throw "Typecheck fallido" }
 npm run validate:pwa
+if ($LASTEXITCODE -ne 0) { throw "PWA gate fallido" }
 npm run validate:security
+if ($LASTEXITCODE -ne 0) { throw "Security gate fallido" }
 npm run validate:migrations
+if ($LASTEXITCODE -ne 0) { throw "Migrations gate fallido" }
 npm run qa:p3:deploy:preflight
+if ($LASTEXITCODE -ne 0) { throw "Preflight fallido" }
 npx wrangler deploy --config wrangler.toml --dry-run --keep-vars
+if ($LASTEXITCODE -ne 0) { throw "Wrangler dry-run fallido" }
 ```
 
 Inspect Wrangler's dry-run binding/asset summary for **msm-mail-preview** (not control plane), intended D1/KV/services and current asset directory. Do not paste token, secret or account IDs in chat. If any binding changed or the preview target is wrong, abort.
@@ -26,7 +38,9 @@ Only after all checks are green and the dry run targets the correct Worker:
 
 ```powershell
 npm run qa:p2:release:prepare
+if ($LASTEXITCODE -ne 0) { throw "Release prepare fallido" }
 npx wrangler deploy --config wrangler.toml --keep-vars
+if ($LASTEXITCODE -ne 0) { throw "Deploy fallido" }
 ```
 
 `--keep-vars` preserves dashboard-managed environment variables rather than deleting them when omitted from local config; it does not replace review of bindings and is not a blanket assurance that all deployment settings are preserved. This deployment is a real traffic-affecting change; explicitly authorized by the owner in the current round.
