@@ -145,7 +145,7 @@ let draftId=null,draftTimer=null,draftLoadSerial=0,draftGeneration=0,draftRevisi
 const splitRecipients=id=>$(id).value.split(/[;,\n]/).map(value=>value.trim()).filter(Boolean);
 const draftPayload=()=>({
  account_id:state.account.id,to:splitRecipients("draft-to"),cc:splitRecipients("draft-cc"),
- bcc:splitRecipients("draft-bcc"),subject:$("draft-subject").value,text_body:$("draft-body").value
+ bcc:splitRecipients("draft-bcc"),subject:$("draft-subject").value,text_body:$("draft-body").value,...(state.replyHeaders||{})
 });
 async function refreshSendReadiness(){
  const accountId=state.account?.id,generation=draftGeneration;
@@ -187,6 +187,8 @@ async function editDraft(message){
  for(const [key,id] of Object.entries(values))$(id).value=addressText(draft[key]);
  $("draft-subject").value=draft.subject||"";
  $("draft-body").value=draft.text_body||"";
+ const refs=String(draft.references_header||"").split(/\s+/).filter(Boolean);
+ state.replyHeaders=(draft.in_reply_to||refs.length)?{...(draft.in_reply_to?{in_reply_to:draft.in_reply_to}:{}),references:refs.slice(-20)}:null;
  draftId=draft.id;
  $("draft-status").textContent="Borrador recuperado. Los cambios se guardan automáticamente.";
 }
