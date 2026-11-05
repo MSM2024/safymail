@@ -14,7 +14,7 @@ function Check-Dns([string]$Name,[string]$Type){
    } elseif($Type -eq "TXT"){
      $txt = @($records | Where-Object { $_.Type -eq "TXT" } | ForEach-Object { $_.Strings -join "" })
      $spf=@($txt|Where-Object { $_ -match '^v=spf1(?:\s|$)' })
-     $dmarc=@($txt|Where-Object { $_ -match '^v=DMARC1(?:\s|$)' })
+     $dmarc=@($txt|Where-Object { $_ -match '^v=DMARC1(?:;|\s|$)' })
      if($Name.StartsWith("_dmarc.")){Write-Host ("DNS DMARC [{0}]: {1} record(s)" -f $Name,$dmarc.Count)}
      else{Write-Host ("DNS SPF [{0}]: {1} record(s)" -f $Name,$spf.Count)}
    }
