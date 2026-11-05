@@ -28,4 +28,8 @@ RESEND_REGION = "{{RESEND_REGION}}"
 CONTROL_PLANE_URL = "{{CONTROL_PLANE_URL}}"
 INSTALLATION_ID = "{{INSTALLATION_ID}}"
 
+[[services]]
+binding = "CONTROL_PLANE_SERVICE"
+service = "msm-mail-control-plane"
+
 # No per-installation Cron: maintenance is dispatched by the shared control plane.
