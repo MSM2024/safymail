@@ -33,15 +33,41 @@ export async function verify(target = TARGET, fetchFn = fetch) {
   };
 }
 
+export async function comparePublicShells(fetchFn = fetch) {
+  // Fixed-origin read-only probes; query parameters can be normalized by cache rules.
+  const paths = ["/", "/index.html", "/index.html?msm_p1_probe=20261105"];
+  const results = [];
+  for (const path of paths) {
+    const target = new URL(path, TARGET).toString();
+    const response = await fetchFn(target, {
+      method: "GET", redirect: "manual", cache: "no-store",
+      headers: { Accept: "text/html", "Cache-Control": "no-cache" },
+      signal: AbortSignal.timeout(12000),
+    });
+    const text = response.ok && (response.headers.get("content-type") || "").toLowerCase().includes("text/html")
+      ? await response.text() : "";
+    results.push({
+      path, status: response.status,
+      result: response.ok ? classify(text) : "http-error",
+      cfCacheStatus: response.headers.get("cf-cache-status") || "not-reported",
+      cacheControl: response.headers.get("cache-control") || "not-reported",
+      age: response.headers.get("age") || "not-reported",
+    });
+  }
+  return results;
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
     const result = await verify();
     console.log("MSM MAIL public deployment check:", JSON.stringify(result));
-    if (result.result !== "current") {
-      console.error("P1-01 BLOCKED: this check does not establish deployed Worker SHA or authenticated E2E readiness.");
+    const variants = await comparePublicShells();
+    console.log("MSM MAIL multi-path cache diagnosis:", JSON.stringify(variants));
+    if (result.result !== "current" || variants.some(item => item.result !== "current")) {
+      console.error("P1-01 BLOCKED: a public page differs from main or was unavailable. Check deployment SHA, cache rules and targeted purge only after deployment is verified.");
       process.exitCode = 1;
     } else {
-      console.log("Public login copy matches main; confirm deployed SHA and the remaining P1 E2E gates separately.");
+      console.log("Public login copy matches main on all routes; verify deployed Worker SHA and authenticated E2E separately.");
     }
   } catch (error) {
     console.error("P1-01 BLOCKED: public deployment fetch unavailable:", error instanceof Error ? error.message : String(error));
