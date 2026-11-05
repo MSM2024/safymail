@@ -1,3 +1,4 @@
+import { mfaAuthenticatedUser } from "./mfa-role";
 import { consumeMfaRecoveryCode } from "./recovery";
 import { Hono } from "hono";
 import type { Env, AppVariables } from "../types";
@@ -161,7 +162,7 @@ auth.post("/mfa/verify", async c => {
   if(usedBackupCode)await c.env.DB.prepare("INSERT INTO audit_logs(id,actor_user_id,action,resource_type,resource_id) VALUES(?,?,'auth.backup_code_used','user',?)")
     .bind(crypto.randomUUID(),challenge.user_id,challenge.user_id).run();
   await c.env.DB.prepare("UPDATE users SET last_login_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?").bind(challenge.user_id).run();
-  return c.json({user:{id:challenge.user_id,email:challenge.email,displayName:challenge.display_name,isSuperadmin:challenge.is_superadmin===1,mfaEnabled:true}});
+  return c.json({user:mfaAuthenticatedUser(challenge)});
 });
 
 auth.post("/logout",async c=>{await revokeSession(c);c.header("Set-Cookie",MFA_COOKIE+"=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict",{append:true});return c.json({ok:true});});
