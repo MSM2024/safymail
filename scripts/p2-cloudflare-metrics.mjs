@@ -35,18 +35,20 @@ export function assessCloudflareMetrics(input,now=new Date()){
        status="OBSERVED";reason="checked";
      }else reason="invalid-observation";
    }
-   const utilization=status==="OBSERVED"&&typeof row.limit==="number"?row.value/row.limit:null;
+   const budget=BUDGET_METRICS.includes(row.id);
+   const utilization=status==="OBSERVED"&&budget&&typeof row.limit==="number"?row.value/row.limit:null;
    const band=utilization===null?"UNKNOWN":utilization>=1?"EXHAUSTED":utilization>=.95?"CRITICAL":utilization>=.8?"WARNING":utilization>=.5?"WATCH":"BELOW-WATCH";
    checks.push({id:row.id,status,band,reason});
  }
  const missing=METRICS.filter(id=>!seen.has(id));
  const incomplete=[...missing,...checks.filter(c=>c.status!=="OBSERVED").map(c=>c.id)];
- const capUnknown=checks.filter(c=>c.status==="OBSERVED"&&c.band==="UNKNOWN").map(c=>c.id);
+ const capUnknown=checks.filter(c=>c.status==="OBSERVED"&&BUDGET_METRICS.includes(c.id)&&c.band==="UNKNOWN").map(c=>c.id);
+ const queueProblems=checks.filter(c=>c.status==="OBSERVED"&&QUEUE_METRICS.includes(c.id)&&input.metrics.find(row=>row.id===c.id)?.value>0).map(c=>c.id);
  const concerning=checks.filter(c=>["EXHAUSTED","CRITICAL","WARNING"].includes(c.band)).map(c=>c.id);
  // Even when dashboard metrics appear healthy, Queue success is a separate
  // provider/consumer validation, not inferred from a zero backlog snapshot.
- const result=incomplete.length||capUnknown.length||concerning.length?"PARTIAL":"METRICS-OBSERVED";
- return {result,missing,incomplete,capUnknown,concerning,checks,
+ const result=incomplete.length||capUnknown.length||concerning.length||queueProblems.length?"PARTIAL":"METRICS-OBSERVED";
+ return {result,missing,incomplete,capUnknown,concerning,queueProblems,checks,
   note:"A snapshot cannot prove queue delivery or zero historical retries. Confirm consumer history and DLQ separately; no plan cap is inferred."};
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(path.resolve(process.argv[1])).href){
