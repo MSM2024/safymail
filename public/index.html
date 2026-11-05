@@ -157,7 +157,7 @@ function replyMessage(message,mode,originalAttachments=[]){
   state.replyHeaders={...(message.message_id_header?{in_reply_to:message.message_id_header}:{}),references:[...new Set(refs)].slice(-20)};
  }
 }
-let draftId=null,draftTimer=null,draftLoadSerial=0,draftGeneration=0,draftRevision=0,draftSavedRevision=0,draftWrite=Promise.resolve(),draftSent=false;
+let draftId=null,draftVersion=null,draftTimer=null,draftLoadSerial=0,draftGeneration=0,draftRevision=0,draftSavedRevision=0,draftWrite=Promise.resolve(),draftSent=false;
 let forwardAttachmentLoading=false,forwardAttachmentError=null;
 const splitRecipients=id=>$(id).value.split(/[;,\n]/).map(value=>value.trim()).filter(Boolean);
 const draftPayload=()=>({
@@ -183,7 +183,7 @@ async function refreshSendReadiness(){
 function openComposer(title="Nuevo mensaje"){
  state.replyHeaders=null;
  if(!state.account){$("list-status").textContent="Selecciona un buzón antes de redactar.";return;}
- clearTimeout(draftTimer);draftLoadSerial++;draftGeneration++;draftRevision=0;draftSavedRevision=0;draftId=null;draftSent=false;state.pendingSend=null;forwardAttachmentLoading=false;forwardAttachmentError=null;
+ clearTimeout(draftTimer);draftLoadSerial++;draftGeneration++;draftRevision=0;draftSavedRevision=0;draftId=null;draftVersion=null;draftSent=false;state.pendingSend=null;forwardAttachmentLoading=false;forwardAttachmentError=null;
  $("compose-form").reset();$("compose-modal").querySelector(".modal-head h2").textContent=title;
  $("draft-status").textContent="Autoguardado activado. Los adjuntos se incorporan al enviar.";
  $("file-summary").innerHTML="<span>No hay archivos adjuntos.</span><strong>0 archivos · 0 MB</strong>";
@@ -207,6 +207,7 @@ async function editDraft(message){
  const refs=String(draft.references_header||"").split(/\s+/).filter(Boolean);
  state.replyHeaders=(draft.in_reply_to||refs.length)?{...(draft.in_reply_to?{in_reply_to:draft.in_reply_to}:{}),references:refs.slice(-20)}:null;
  draftId=draft.id;
+ draftVersion=draft.version;
  $("draft-status").textContent="Borrador recuperado. Los cambios se guardan automáticamente.";
 }
 async function restoreForwardAttachments(attachments,generation){
@@ -282,9 +283,10 @@ async function saveDraft(closeAfter=false){
    $("draft-status").textContent="Guardando borrador…";
    const endpoint=draftId?"/api/drafts/"+encodeURIComponent(draftId):"/api/drafts";
    const method=draftId?"PATCH":"POST";
-   const response=await api(endpoint,{method,body:JSON.stringify(payload)});
+   const response=await api(endpoint,{method,body:JSON.stringify(draftId?{...payload,if_match:draftVersion}:payload)});
    if(generation!==draftGeneration)return false;
    if(!draftId)draftId=response.draft.id;
+   draftVersion=response.draft?.version||response.version;
    draftSavedRevision=revision;
    $("draft-status").textContent="Borrador guardado";
    return true;
