@@ -40,7 +40,8 @@ export function localPreflight(){
  return assessDeployPreflight({
    branch:git(["branch","--show-current"]),
    head:git(["rev-parse","HEAD"]),
-   originMain:git(["rev-parse","origin/main"]),
+   releaseMain:git(["rev-parse","refs/remotes/"+remote+"/main"]),
+   remoteUrl,
    gitStatus:git(["status","--porcelain","--untracked-files=no"]),
    config:readFileSync(configPath,"utf8")
  });
