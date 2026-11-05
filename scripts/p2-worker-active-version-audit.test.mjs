@@ -54,7 +54,10 @@ test("Wrangler fallback only reads deployment listing with safe fixed arguments"
     return {status:0,stdout:"Created: 2026-11-05T17:37:15.766Z\nVersion(s): (100%) "+expected};
   });
   assert.equal(out.result,"expected-version-at-100-percent");
-  assert.deepEqual(seen.args,["--no-install","wrangler","deployments","list","--config","wrangler.toml"]);
+  assert.equal(seen.cmd,process.execPath);
+  assert.match(seen.args[0],/wrangler[\\/]bin[\\/]wrangler\\.js$/);
+  assert.deepEqual(seen.args.slice(1),["deployments","list","--config","wrangler.toml"]);
+  assert.equal(seen.options.shell,false);
   assert.equal(seen.options.windowsHide,true);
   assert.throws(()=>readWranglerDeployment(expected,()=>({status:1,stdout:""})),/unavailable/);
 });
