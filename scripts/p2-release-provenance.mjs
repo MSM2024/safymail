@@ -57,6 +57,22 @@ export function compareRelease(published, expectedCommit, source, shell) {
   return "manifest-match";
 }
 
+export function compareHistoricalRelease(remote, commit, historicalSource, historicalShell) {
+  let result = compareRelease(remote, commit, historicalSource, historicalShell);
+  if (result === "source-mismatch" || result === "shell-mismatch") {
+    const windowsText = (bytes) => Buffer.from(bytes.toString("utf8").replace(/\r?\n/g, "\r\n"));
+    const attempts = [
+      [windowsText(historicalSource), historicalShell],
+      [historicalSource, windowsText(historicalShell)],
+      [windowsText(historicalSource), windowsText(historicalShell)]
+    ];
+    if (attempts.some(([src, html]) => compareRelease(remote, commit, src, html) === "manifest-match")) {
+      result = "manifest-match-windows-checkout";
+    }
+  }
+  return result;
+}
+
 function git(args) {
   return execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 }
@@ -100,18 +116,7 @@ async function main() {
     try {
       const historicalSource = gitFileAtCommit(publishedCommit, "src/index.ts");
       const historicalShell = gitFileAtCommit(publishedCommit, "public/index.html");
-      result = compareRelease(remote, publishedCommit, historicalSource, historicalShell);
-      if (result === "source-mismatch" || result === "shell-mismatch") {
-        const windowsText = (bytes) => Buffer.from(bytes.toString("utf8").replace(/\r?\n/g, "\r\n"));
-        const attempts = [
-          [windowsText(historicalSource), historicalShell],
-          [historicalSource, windowsText(historicalShell)],
-          [windowsText(historicalSource), windowsText(historicalShell)]
-        ];
-        if (attempts.some(([src, html]) => compareRelease(remote, publishedCommit, src, html) === "manifest-match")) {
-          result = "manifest-match-windows-checkout";
-        }
-      }
+      result = compareHistoricalRelease(remote, publishedCommit, historicalSource, historicalShell);
     } catch {
       result = "published-commit-unavailable-locally";
     }
