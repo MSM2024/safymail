@@ -16,6 +16,10 @@ npm run qa:p3:deploy:preflight
 
 If the `msm` remote already exists, verify its URL via `git remote get-url msm` and use `git fetch msm main`; do not blindly replace it. Abort if the histories diverge rather than forcing a merge. The P3 script reads `refs/remotes/msm/main` and validates the literal approved GitHub remote URL before comparing commits. Optional `MSM_RELEASE_REMOTE` can select a different **approved** remote name. `msm/main` is the release source; `origin` remains the original template.
 
+### Corrected Windows Wrangler preflight parsing
+
+On 2026-11-05, Wrangler correctly reported `name = "msm-mail-preview"` and live deployment history, but the P3 preflight returned `wrong-worker-target`. The check now accepts UTF-8 BOM, CRLF, and indentation in `wrangler.toml` while still rejecting `msm-mail-control-plane` or other names. **Do not change the Worker name** to work around a parser error. After syncing `msm/main`, rerun `npm run qa:p3:deploy:preflight`; stop if it reports any other blocker.
+
 ## 1. Operator commands: safe gates, then explicit deploy
 
 **Corrección tras prueba del operador (2026-11-05):** este repositorio NO contiene `package-lock.json`, por lo que `npm ci` da `EUSAGE` y no demuestra un fallo de la aplicación. Usa `npm install --no-package-lock` para instalar las versiones permitidas por `package.json` sin crear un lockfile local. Este método es **menos reproducible** que una instalación bloqueada; la tarea futura es incorporar un lockfile versionado y sustituirlo por `npm ci`. No ejecutes deploy si algún gate falla: PowerShell no cancela automáticamente una lista de comandos después de un error de npm.
