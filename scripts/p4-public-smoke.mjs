@@ -3,6 +3,7 @@ import {pathToFileURL} from "node:url";
 export const ORIGIN="https://mailme.msmmystore.com";
 export const PUBLIC_ASSETS=Object.freeze([
   ["/", "text/html"],
+  ["/admin", "text/html"],
   ["/admin.html", "text/html"],
   ["/msm-mail-ui.js", "javascript"],
   ["/msm-mail-ui.css", "text/css"],
@@ -31,6 +32,7 @@ export function classifyProbe(path,response,body,contentType){
   const required=PUBLIC_ASSETS.find(([p])=>p===path)[1];
   if(!contentType.toLowerCase().includes(required))
     return {path,result:"FAIL-CONTENT-TYPE",status:response.status};
+  if(path==="/admin" && !body.includes("Administración · Mail Center"))return {path,result:"FAIL-ADMIN-CONTENT",status:response.status};
   if(path==="/api/health"){
     let payload;try{payload=JSON.parse(body)}catch{return {path,result:"FAIL-HEALTH-JSON",status:response.status}};
     if(payload?.status!=="ok")return {path,result:"FAIL-HEALTH-STATUS",status:response.status};
@@ -53,9 +55,9 @@ export function inspectAdminRedirect(response){
   }
   if(target.origin!==ORIGIN||target.username||target.password||target.hash||target.search)
     return {result:"FAIL-ADMIN-REDIRECT-UNTRUSTED",status:response.status,redirect:"external-or-query"};
-  if(target.pathname!=="/")
+  if(target.pathname!=="/admin")
     return {result:"FAIL-ADMIN-REDIRECT-UNEXPECTED",status:response.status,redirect:target.pathname};
-  return {result:"PENDING-ADMIN-LOGIN-LANDING",status:response.status,redirect:"/"};
+  return {result:"PENDING-ADMIN-CANONICAL",status:response.status,redirect:"/admin"};
 }
 
 export async function runSmoke(fetchFn=fetch){
@@ -70,17 +72,19 @@ export async function runSmoke(fetchFn=fetch){
       if(path==="/admin.html"){
         const redirect=inspectAdminRedirect(response);
         if(redirect){
-          if(redirect.result==="PENDING-ADMIN-LOGIN-LANDING"){
-            // Only the single fixed official login location is eligible. Never follow arbitrary redirects.
-            const login=await fetchFn(ORIGIN+"/",{
+          if(redirect.result==="PENDING-ADMIN-CANONICAL"){
+            // A single fixed canonical hop is allowed only when /admin serves the real admin HTML.
+            const canonical=await fetchFn(ORIGIN+"/admin",{
               method:"GET",redirect:"manual",cache:"no-store",credentials:"omit",
               headers:{Accept:"text/html","Cache-Control":"no-cache"},signal:AbortSignal.timeout(12000)
             });
-            const loginType=(login.headers.get("content-type")||"").toLowerCase();
-            rows.push({path,result:login.status===200&&loginType.includes("text/html")?
-              "PASS-ADMIN-LOGIN-REDIRECT":"FAIL-ADMIN-LOGIN-LANDING",
-              status:response.status,redirect:"/",landingStatus:login.status,
-              note:"Login redirect only; authenticated admin UI is not certified."});
+            const canonicalBody=(await canonical.text()).slice(0,8192);
+            const validated=classifyProbe("/admin",canonical,canonicalBody,canonical.headers.get("content-type")||"");
+            rows.push({path,result:validated.result==="PASS-PUBLIC"?
+              "PASS-ADMIN-CANONICAL":"FAIL-ADMIN-CANONICAL",
+              status:response.status,redirect:"/admin",landingStatus:canonical.status,
+              landingResult:validated.result,
+              note:"Canonical route verified; authenticated admin API remains separately guarded."});
           }else rows.push({path,...redirect});
           continue;
         }
