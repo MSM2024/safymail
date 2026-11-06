@@ -42,6 +42,22 @@ export function classifyProbe(path,response,body,contentType){
   }
   return {path,result:"PASS-PUBLIC",status:response.status};
 }
+export function inspectAdminRedirect(response){
+  if(response.status!==301&&response.status!==302&&response.status!==303&&response.status!==307&&response.status!==308)
+    return null;
+  const raw=response.headers.get("location");
+  if(!raw)return {result:"FAIL-ADMIN-REDIRECT-MISSING-LOCATION",status:response.status};
+  let target;
+  try{target=new URL(raw,ORIGIN+"/admin.html");}catch{
+    return {result:"FAIL-ADMIN-REDIRECT-INVALID-LOCATION",status:response.status};
+  }
+  if(target.origin!==ORIGIN||target.username||target.password||target.hash||target.search)
+    return {result:"FAIL-ADMIN-REDIRECT-UNTRUSTED",status:response.status,redirect:"external-or-query"};
+  if(target.pathname!=="/")
+    return {result:"FAIL-ADMIN-REDIRECT-UNEXPECTED",status:response.status,redirect:target.pathname};
+  return {result:"PENDING-ADMIN-LOGIN-LANDING",status:response.status,redirect:"/"};
+}
+
 export async function runSmoke(fetchFn=fetch){
   const rows=[];
   for(const path of [...PUBLIC_ASSETS.map(([p])=>p),...PRIVATE_ENDPOINTS]){
@@ -51,6 +67,24 @@ export async function runSmoke(fetchFn=fetch){
         headers:{Accept: path.startsWith("/api/")?"application/json":"*/*","Cache-Control":"no-cache"},
         signal:AbortSignal.timeout(12000)
       });
+      if(path==="/admin.html"){
+        const redirect=inspectAdminRedirect(response);
+        if(redirect){
+          if(redirect.result==="PENDING-ADMIN-LOGIN-LANDING"){
+            // Only the single fixed official login location is eligible. Never follow arbitrary redirects.
+            const login=await fetchFn(ORIGIN+"/",{
+              method:"GET",redirect:"manual",cache:"no-store",credentials:"omit",
+              headers:{Accept:"text/html","Cache-Control":"no-cache"},signal:AbortSignal.timeout(12000)
+            });
+            const loginType=(login.headers.get("content-type")||"").toLowerCase();
+            rows.push({path,result:login.status===200&&loginType.includes("text/html")?
+              "PASS-ADMIN-LOGIN-REDIRECT":"FAIL-ADMIN-LOGIN-LANDING",
+              status:response.status,redirect:"/",landingStatus:login.status,
+              note:"Login redirect only; authenticated admin UI is not certified."});
+          }else rows.push({path,...redirect});
+          continue;
+        }
+      }
       const body=await response.text();
       rows.push(classifyProbe(path,response,body.slice(0,8192),response.headers.get("content-type")||""));
     }catch(error){
