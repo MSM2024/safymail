@@ -1705,7 +1705,7 @@ app.notFound((c) => c.json({ error: "not_found" }, 404));
 export default {
   fetch: (request: Request, env: Env, ctx: ExecutionContext) => {
     const url = new URL(request.url);
-    if (url.pathname === "/admin" || url.pathname === "/admin/") return Response.redirect(new URL("/admin.html", url.origin), 302);
+    // Cloudflare Workers Assets serves public/admin.html at the canonical /admin URL.\n    // Never redirect /admin back to /admin.html: Assets normalizes that URL to /admin (307).
     if (url.pathname === "/api" || url.pathname.startsWith("/api/")) {
       return app.fetch(request, env, ctx);
     }
