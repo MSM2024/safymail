@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
-import {makeProbe, classifyProbe, runSmoke, PUBLIC_ASSETS, PRIVATE_ENDPOINTS} from "./p4-public-smoke.mjs";
+import {makeProbe, classifyProbe, inspectAdminRedirect, runSmoke, PUBLIC_ASSETS, PRIVATE_ENDPOINTS} from "./p4-public-smoke.mjs";
 
 const source=readFileSync(new URL("../src/index.ts",import.meta.url),"utf8");
 test("branding is public through both session and tenant middleware",()=>{
@@ -41,4 +41,33 @@ test("fails closed for leaked private data, broken public branding and redirects
  assert.equal(classifyProbe("/api/branding",r(200),"{}", "application/json").result,"FAIL-BRANDING-PAYLOAD");
  assert.equal(classifyProbe("/",r(302),"", "text/html").result,"FAIL-PUBLIC-HTTP");
  assert.equal(classifyProbe("/api/health",r(200),'{"status":"degraded"}',"application/json").result,"FAIL-HEALTH-STATUS");
+});
+
+test("admin redirect must be same-origin, fixed-path and not a canonical loop",async()=>{
+ const redirect=(location,status=307)=>({status,headers:new Headers({Location:location})});
+ assert.equal(inspectAdminRedirect(redirect("/")).result,"PENDING-ADMIN-LOGIN-LANDING");
+ assert.equal(inspectAdminRedirect(redirect("https://evil.example/")).result,"FAIL-ADMIN-REDIRECT-UNTRUSTED");
+ assert.equal(inspectAdminRedirect(redirect("/admin")).result,"FAIL-ADMIN-REDIRECT-UNEXPECTED");
+ assert.equal(inspectAdminRedirect(redirect("/admin.html")).result,"FAIL-ADMIN-REDIRECT-UNEXPECTED");
+ assert.equal(inspectAdminRedirect(redirect("/?token=secret")).result,"FAIL-ADMIN-REDIRECT-UNTRUSTED");
+ assert.equal(inspectAdminRedirect(redirect("/#section")).result,"FAIL-ADMIN-REDIRECT-UNTRUSTED");
+ assert.equal(inspectAdminRedirect(redirect("",307)).result,"FAIL-ADMIN-REDIRECT-MISSING-LOCATION");
+ const requests=[];
+ const result=await runSmoke(async (url,opts)=>{
+   requests.push(url);
+   const path=new URL(url).pathname;
+   if(path==="/admin.html")return new Response(null,{status:307,headers:{Location:"/"}});
+   if(PRIVATE_ENDPOINTS.includes(path))return new Response(JSON.stringify({error:"unauthorized"}),{status:401,headers:{"Content-Type":"application/json"}});
+   const type=path==="/"?"text/html":path.endsWith(".css")?"text/css":path.endsWith(".js")?"text/javascript":"application/json";
+   const body=path==="/api/health"?JSON.stringify({status:"ok"}):path==="/api/branding"?JSON.stringify({product_name:"Mail Center"}):"shell";
+   return new Response(body,{status:200,headers:{"Content-Type":type}});
+ });
+ assert.equal(result.result,"PASS-READ-ONLY");
+ assert.equal(result.rows.find(x=>x.path==="/admin.html").result,"PASS-ADMIN-LOGIN-REDIRECT");
+ assert.equal(requests.filter(url=>url==="https://mailme.msmmystore.com/").length,2);
+});
+test("redirect to unrelated internal page is reported rather than marked as pass",async()=>{
+ const response={status:307,headers:new Headers({Location:"/different-path"})};
+ assert.equal(inspectAdminRedirect(response).redirect,"/different-path");
+ assert.equal(inspectAdminRedirect(response).result,"FAIL-ADMIN-REDIRECT-UNEXPECTED");
 });

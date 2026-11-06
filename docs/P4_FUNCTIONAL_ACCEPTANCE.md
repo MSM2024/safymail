@@ -36,3 +36,9 @@ Source/CI evidence does **not** certify external delivery, Cloudflare queues, Re
 ## Deployment gate
 
 Merge after green CI; update local `main` from the approved `msm` remote while retaining upstream template `origin`. Run `npm test`, `npm run typecheck`, `npm run qa:p3:deploy:preflight` and Wrangler `--dry-run --keep-vars`. Review the actual D1, KV and control-plane service bindings before deploying the existing `msm-mail-preview` only. Then run P4 smoke. This change does not perform any remote deployment.
+
+## P4-02 — 307 de `/admin.html` (diagnóstico y control)
+
+El operador comprobó 12/13 rutas públicas y guardas privadas; `/admin.html` devolvió HTTP 307. El destino `Location` no se incluyó en el registro, por lo que no se puede clasificar aún como redirección de autenticación, canonización o error. El verificador ahora **no acepta cualquier redirección**: bloquea destinos externos, rutas distintas, query/hash, y ciclos `/admin`↔`/admin.html`. Únicamente considera aceptable que `/admin.html` redirija al inicio público `/` y comprueba con un GET anónimo adicional que el destino responde 200 HTML. En ese caso informa `PASS-ADMIN-LOGIN-REDIRECT`, especificando que la interfaz administrativa autenticada no está certificada. Si vuelve a bloquear, la salida identifica el motivo y la ruta de destino interna sin exponer tokens.
+
+Para finalizar la certificación administrativa, debe comprobarse manualmente el acceso autorizado con MFA, el renderizado de `/admin.html` y las operaciones de administración dentro de la sesión.
